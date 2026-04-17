@@ -1,0 +1,181 @@
+// Package receiver implements the Receiver, the inbound data plane agent.
+// The Receiver polls QUIC connections for incoming data and writes image log buffers.
+package receiver
+
+import (
+	"context"
+	"encoding/binary"
+	"log/slog"
+
+	"github.com/cloud-jumpgate/hyperspace/pkg/driver/conductor"
+	"github.com/cloud-jumpgate/hyperspace/pkg/logbuffer"
+	"github.com/cloud-jumpgate/hyperspace/pkg/transport/pool"
+)
+
+// Receiver is the inbound data plane agent.
+type Receiver struct {
+	conductor *conductor.Conductor
+	pools     map[string]*pool.Pool
+	images    map[int32]*logbuffer.LogBuffer // sessionID → image log buffer
+	mtu       int
+	termLen   int // term length for image log buffers
+}
+
+// New creates a Receiver.
+func New(cond *conductor.Conductor, mtu int) *Receiver {
+	if mtu <= 0 {
+		mtu = 1200
+	}
+	return &Receiver{
+		conductor: cond,
+		pools:     make(map[string]*pool.Pool),
+		images:    make(map[int32]*logbuffer.LogBuffer),
+		mtu:       mtu,
+		termLen:   logbuffer.MinTermLength, // use minimum for image buffers in sprint 3
+	}
+}
+
+// AddPool registers a pool to poll for incoming data.
+func (r *Receiver) AddPool(peer string, p *pool.Pool) {
+	r.pools[peer] = p
+}
+
+// DoWork polls all connections in all pools for incoming data frames.
+// For each received frame: look up or create an image log buffer by sessionID,
+// write the frame into the image at the correct termOffset (from frame header).
+// Returns total frames received.
+func (r *Receiver) DoWork(ctx context.Context) int {
+	if len(r.pools) == 0 {
+		return 0
+	}
+
+	totalReceived := 0
+
+	for _, p := range r.pools {
+		conns := p.Connections()
+		for _, conn := range conns {
+			for {
+				_, data, err := conn.RecvData(ctx)
+				if err != nil {
+					slog.Warn("receiver: recv error", "error", err)
+					break
+				}
+				if data == nil {
+					// No more data from this connection right now.
+					break
+				}
+
+				if r.processFrame(data) {
+					totalReceived++
+				}
+			}
+		}
+	}
+
+	return totalReceived
+}
+
+// processFrame parses an incoming frame and writes it to the appropriate image log buffer.
+// Frame format: standard Hyperspace frame header (32 bytes) + payload.
+// Returns true if the frame was successfully processed.
+func (r *Receiver) processFrame(data []byte) bool {
+	if len(data) < logbuffer.HeaderLength {
+		slog.Warn("receiver: frame too short", "len", len(data))
+		return false
+	}
+
+	// Validate frame length field against data length.
+	frameLen := int(int32(binary.LittleEndian.Uint32(data[0:])))
+	if frameLen <= 0 || frameLen > len(data) {
+		slog.Warn("receiver: invalid frame length", "frame_len", frameLen, "data_len", len(data))
+		return false
+	}
+
+	// Validate payload size against MTU.
+	payloadLen := frameLen - logbuffer.HeaderLength
+	if payloadLen < 0 || payloadLen > r.mtu {
+		slog.Warn("receiver: payload exceeds MTU or negative", "payload_len", payloadLen, "mtu", r.mtu)
+		return false
+	}
+
+	// Extract header fields.
+	// sessionID at offset 12, termOffset at offset 8.
+	sessionID := int32(binary.LittleEndian.Uint32(data[12:]))
+	termOffset := int32(binary.LittleEndian.Uint32(data[8:]))
+
+	if termOffset < 0 {
+		slog.Warn("receiver: negative termOffset", "term_offset", termOffset)
+		return false
+	}
+
+	// Look up or create an image log buffer for this session.
+	lb, err := r.getOrCreateImage(sessionID)
+	if err != nil {
+		slog.Error("receiver: failed to create image log buffer",
+			"session_id", sessionID,
+			"error", err,
+		)
+		return false
+	}
+
+	// Write the frame into the image log buffer at the active partition.
+	activePartIdx := int(lb.ActivePartitionIndex())
+	if activePartIdx < 0 || activePartIdx >= logbuffer.NumPartitions {
+		activePartIdx = 0
+	}
+
+	termBuf := lb.TermBuffer(activePartIdx)
+	writeOffset := int(termOffset)
+
+	// Bounds check: frame must fit within the term.
+	if writeOffset+frameLen > termBuf.Capacity() {
+		slog.Warn("receiver: frame does not fit in term",
+			"session_id", sessionID,
+			"term_offset", termOffset,
+			"frame_len", frameLen,
+			"capacity", termBuf.Capacity(),
+		)
+		return false
+	}
+
+	// Write payload bytes into the term buffer (after the header region).
+	if payloadLen > 0 {
+		termBuf.PutBytes(writeOffset+logbuffer.HeaderLength, data[logbuffer.HeaderLength:logbuffer.HeaderLength+payloadLen])
+	}
+
+	// Write the frame length last (as a volatile store) to signal readers.
+	termBuf.PutInt32Ordered(writeOffset, int32(frameLen))
+
+	slog.Debug("receiver: frame written",
+		"session_id", sessionID,
+		"term_offset", termOffset,
+		"frame_len", frameLen,
+	)
+	return true
+}
+
+// getOrCreateImage returns the image log buffer for sessionID, creating one if needed.
+func (r *Receiver) getOrCreateImage(sessionID int32) (*logbuffer.LogBuffer, error) {
+	if lb, ok := r.images[sessionID]; ok {
+		return lb, nil
+	}
+
+	bufSize := logbuffer.NumPartitions*r.termLen + logbuffer.LogMetaDataLength
+	backing := make([]byte, bufSize)
+	lb, err := logbuffer.New(backing, r.termLen)
+	if err != nil {
+		return nil, err
+	}
+	r.images[sessionID] = lb
+	slog.Info("receiver: created image log buffer", "session_id", sessionID)
+	return lb, nil
+}
+
+// Name returns "receiver".
+func (r *Receiver) Name() string { return "receiver" }
+
+// Close releases receiver resources.
+func (r *Receiver) Close() error {
+	r.images = make(map[int32]*logbuffer.LogBuffer)
+	return nil
+}
