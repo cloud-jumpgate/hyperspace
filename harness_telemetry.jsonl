@@ -1,0 +1,1 @@
+{"timestamp":"[ISO_TIMESTAMP]","project":"[PROJECT_NAME]","event":"project_init","agent":"harness-architect","session_id":"sess_init","details":{"state":"pre_kickoff","framework_version":"1.0"}}

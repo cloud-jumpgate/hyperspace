@@ -1,0 +1,304 @@
+{
+  "project": "hyperspace",
+  "module": "github.com/cloud-jumpgate/hyperspace",
+  "version": "0.1.0",
+  "last_updated": "2026-04-17",
+  "last_updated_by": "documentation-engineer",
+  "current_sprint": "S1",
+
+  "sprints": {
+    "S1": {
+      "name": "Foundation",
+      "goal": "Implement log buffer (three-term mmap) and IPC ring buffers with ≥ 90% test coverage",
+      "status": "in_progress",
+      "started": "2026-04-17",
+      "target_end": null,
+      "features": ["F-001", "F-002"]
+    },
+    "S2": {
+      "name": "QUIC Transport",
+      "goal": "quic-go adapter, Multi-QUIC pool, LowestRTT arbitrator, TLS 1.3 enforced",
+      "status": "not_started",
+      "started": null,
+      "target_end": null,
+      "features": ["F-003", "F-004", "F-005"]
+    },
+    "S3": {
+      "name": "Driver Core",
+      "goal": "Conductor, Sender, Receiver agents running as goroutines; hsd binary boots and shuts down cleanly",
+      "status": "not_started",
+      "started": null,
+      "target_end": null,
+      "features": ["F-008"]
+    },
+    "S4": {
+      "name": "Path Intelligence",
+      "goal": "Path Manager sends PING/PONG probes; per-connection RTT/loss tracked atomically",
+      "status": "not_started",
+      "started": null,
+      "target_end": null,
+      "features": ["F-006"]
+    },
+    "S5": {
+      "name": "Pool Intelligence",
+      "goal": "Adaptive Pool Learner right-sizes pool; Pool Manager manages connection lifecycle and cert rotation",
+      "status": "not_started",
+      "started": null,
+      "target_end": null,
+      "features": ["F-007", "F-009"]
+    },
+    "S6": {
+      "name": "Client Library",
+      "goal": "Public Client/Publication/Subscription API; channel URI parser; end-to-end examples run in CI",
+      "status": "not_started",
+      "started": null,
+      "target_end": null,
+      "features": ["F-010"]
+    },
+    "S7": {
+      "name": "Congestion Control",
+      "goal": "CUBIC, BBR, BBRv3 implemented; DRL controller loads ONNX model and runs inference; BBRv3 fallback",
+      "status": "not_started",
+      "started": null,
+      "target_end": null,
+      "features": ["F-011"]
+    },
+    "S8": {
+      "name": "Observability",
+      "goal": "cnc.dat counters; structured slog events; OTel traces/metrics; hyperspace-stat CLI working",
+      "status": "not_started",
+      "started": null,
+      "target_end": null,
+      "features": ["F-012"]
+    },
+    "S9": {
+      "name": "AWS + Identity",
+      "goal": "Cloud Map discovery, SSM config, Secrets Manager certs, SPIFFE/SPIRE SVID fetch — all integration-tested via Localstack",
+      "status": "not_started",
+      "started": null,
+      "target_end": null,
+      "features": ["F-013", "F-014"]
+    },
+    "S10": {
+      "name": "CI/CD, README, Examples, Benchmarks",
+      "goal": "CI pipeline green on all gates; README complete; benchmark scaffolding in cmd/hyperspace-probe",
+      "status": "not_started",
+      "started": null,
+      "target_end": null,
+      "features": []
+    }
+  },
+
+  "features": {
+    "F-001": {
+      "name": "Log Buffer",
+      "description": "Three-term mmap'd ring buffer: atomic appender, reader, term management, frame header",
+      "sprint": "S1",
+      "priority": "P0",
+      "status": "in_progress",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": "sprint_contracts/S1.md",
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Session 2026-04-17: project bootstrap; code not yet written"
+    },
+    "F-002": {
+      "name": "Ring Buffers and IPC",
+      "description": "SPSC and MPSC ring buffers; broadcast transmitter/receiver; mmap utilities",
+      "sprint": "S1",
+      "priority": "P0",
+      "status": "in_progress",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": "sprint_contracts/S1.md",
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Session 2026-04-17: project bootstrap; code not yet written"
+    },
+    "F-003": {
+      "name": "QUIC Transport Adapter",
+      "description": "quic-go wrapper implementing Hyperspace Connection interface; TLS 1.3 config",
+      "sprint": "S2",
+      "priority": "P0",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": "sprint_contracts/S2.md",
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S1 completion"
+    },
+    "F-004": {
+      "name": "Multi-QUIC Connection Pool",
+      "description": "N concurrent QUIC connections per peer; pool data structure",
+      "sprint": "S2",
+      "priority": "P0",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": "sprint_contracts/S2.md",
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S1 completion"
+    },
+    "F-005": {
+      "name": "Connection Arbitrator",
+      "description": "Strategy-based connection selection: LowestRTT, LeastOutstanding, Hybrid, Sticky, Random",
+      "sprint": "S2",
+      "priority": "P0",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": "sprint_contracts/S2.md",
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S1 completion"
+    },
+    "F-006": {
+      "name": "Path Manager and Latency Probes",
+      "description": "PING/PONG probe frames; per-connection RTT/loss/throughput tracking",
+      "sprint": "S4",
+      "priority": "P1",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": null,
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S2, S3"
+    },
+    "F-007": {
+      "name": "Adaptive Pool Learner",
+      "description": "Latency-loss correlation model; automatic pool size adjustment recommendations",
+      "sprint": "S5",
+      "priority": "P1",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": null,
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S4"
+    },
+    "F-008": {
+      "name": "Driver Agents (Conductor, Sender, Receiver)",
+      "description": "Three cooperating goroutines: control plane, outbound data plane, inbound data plane; hsd binary",
+      "sprint": "S3",
+      "priority": "P0",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": null,
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S2"
+    },
+    "F-009": {
+      "name": "Pool Manager Agent",
+      "description": "QUIC connection lifecycle; certificate rotation via SPIRE; integrates Adaptive Pool Learner",
+      "sprint": "S5",
+      "priority": "P0",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": null,
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S4"
+    },
+    "F-010": {
+      "name": "Client Library",
+      "description": "Public Go API: Client, Publication, Subscription, Image; channel URI parser; examples",
+      "sprint": "S6",
+      "priority": "P0",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": null,
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S3, S5"
+    },
+    "F-011": {
+      "name": "Congestion Control",
+      "description": "CUBIC, BBR, BBRv3; DRL controller via ONNX Runtime (CGO); BBRv3 fallback",
+      "sprint": "S7",
+      "priority": "P1",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": null,
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S2; CGO requires Architecture Evaluator awareness"
+    },
+    "F-012": {
+      "name": "Observability",
+      "description": "Atomic named counters (cnc.dat); structured events; OTel traces/metrics; hyperspace-stat CLI",
+      "sprint": "S8",
+      "priority": "P1",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": null,
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S3"
+    },
+    "F-013": {
+      "name": "AWS Integration",
+      "description": "Cloud Map discovery; SSM configuration; Secrets Manager certificate fetch; Localstack CI tests",
+      "sprint": "S9",
+      "priority": "P1",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": null,
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S6; requires Localstack in CI"
+    },
+    "F-014": {
+      "name": "SPIFFE/SPIRE Identity",
+      "description": "Workload identity via SPIRE workload API; X.509 SVID fetch and rotation",
+      "sprint": "S9",
+      "priority": "P0",
+      "status": "not_started",
+      "assignee": "backend-engineer",
+      "model": "claude-sonnet-4-6",
+      "sprint_contract": null,
+      "tests_passing": false,
+      "coverage_pct": null,
+      "notes": "Blocked on S6; Security Evaluator PASS required"
+    }
+  },
+
+  "status_legend": {
+    "not_started": "Not yet begun",
+    "in_progress": "Currently being implemented",
+    "blocked": "Cannot proceed — see notes for blocker",
+    "in_review": "Implementation complete; awaiting Evaluator verdict",
+    "passing": "Evaluator PASS received; feature complete",
+    "failing": "Evaluator FAIL received; being reworked"
+  },
+
+  "satisfaction_scores": [],
+
+  "tech_debt": [
+    {
+      "id": "TD-001",
+      "description": "Q-001 (0-RTT replay risk) must be resolved before F-003 is marked passing",
+      "feature": "F-003",
+      "severity": "medium",
+      "owner": "harness-architect"
+    },
+    {
+      "id": "TD-002",
+      "description": "Q-002 (max message size / fragmentation limit) must be defined before F-001 appender is finalised",
+      "feature": "F-001",
+      "severity": "medium",
+      "owner": "backend-engineer"
+    }
+  ]
+}
