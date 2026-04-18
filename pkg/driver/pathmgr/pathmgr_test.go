@@ -5,12 +5,18 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
+
 	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/pool"
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/probes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // buildPool creates a pool pre-populated with n mock connections.
 func buildPool(peer string, n int, echoMode bool) (*pool.Pool, []*mockConn) {

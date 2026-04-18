@@ -7,7 +7,7 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -32,23 +32,25 @@ func main() {
 
 	d, err := driver.NewEmbedded(cfg)
 	if err != nil {
-		log.Fatalf("failed to create driver: %v", err)
+		slog.Error("failed to create driver", "error", err)
+		os.Exit(1)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	if err := d.Start(ctx); err != nil {
-		log.Fatalf("failed to start driver: %v", err)
+		slog.Error("failed to start driver", "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("hsd started (threading=%s)", *threadingStr)
+	slog.Info("hsd started", "threading", *threadingStr)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
 
-	log.Println("shutting down hsd...")
+	slog.Info("shutting down hsd...")
 	d.Stop()
-	log.Println("hsd stopped")
+	slog.Info("hsd stopped")
 }

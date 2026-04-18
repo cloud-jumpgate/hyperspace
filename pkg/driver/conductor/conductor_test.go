@@ -5,12 +5,18 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"go.uber.org/goleak"
+
 	atomicbuf "github.com/cloud-jumpgate/hyperspace/internal/atomic"
 	"github.com/cloud-jumpgate/hyperspace/pkg/driver/conductor"
 	"github.com/cloud-jumpgate/hyperspace/pkg/ipc/broadcast"
 	"github.com/cloud-jumpgate/hyperspace/pkg/ipc/ringbuffer"
 	"github.com/cloud-jumpgate/hyperspace/pkg/logbuffer"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // bufferSizes for tests — small but valid.
 // Ring buffer: power-of-2 capacity + 128 trailer.

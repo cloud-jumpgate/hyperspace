@@ -9,12 +9,18 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
+
 	"github.com/cloud-jumpgate/hyperspace/pkg/driver/pathmgr"
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/pool"
 	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // ---------------------------------------------------------------------------
 // Mock connection

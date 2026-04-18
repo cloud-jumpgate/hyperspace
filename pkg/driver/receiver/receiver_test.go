@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
+
 	atomicbuf "github.com/cloud-jumpgate/hyperspace/internal/atomic"
 	"github.com/cloud-jumpgate/hyperspace/pkg/driver/conductor"
 	"github.com/cloud-jumpgate/hyperspace/pkg/driver/receiver"
@@ -16,6 +18,10 @@ import (
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/pool"
 	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // --- mock connection that delivers frames ---
 

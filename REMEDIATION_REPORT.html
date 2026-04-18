@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hyperspace — Harness Remediation Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+
+      /* Palette — light */
+      --bg:           #f8f9fa;
+      --surface:      #ffffff;
+      --surface-alt:  #f1f3f5;
+      --border:       #dee2e6;
+      --text:         #212529;
+      --text-muted:   #6c757d;
+
+      /* Status colours */
+      --green:        #2f9e44;
+      --green-bg:     #ebfbee;
+      --green-border: #b2f2bb;
+      --amber:        #e67700;
+      --amber-bg:     #fff9db;
+      --amber-border: #ffe066;
+      --red:          #c92a2a;
+      --red-bg:       #fff5f5;
+      --red-border:   #ffc9c9;
+      --grey:         #495057;
+      --grey-bg:      #f1f3f5;
+      --grey-border:  #ced4da;
+
+      /* Nav */
+      --nav-h:        56px;
+      --nav-bg:       #1c1f26;
+      --nav-text:     #ced4da;
+      --nav-active:   #ffffff;
+      --nav-accent:   #f59f00;
+
+      /* Max content width */
+      --max-w:        1100px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:           #141517;
+        --surface:      #1c1f26;
+        --surface-alt:  #25282f;
+        --border:       #373a40;
+        --text:         #e9ecef;
+        --text-muted:   #868e96;
+
+        --green-bg:     #1a2e1c;
+        --green-border: #2f5132;
+        --amber-bg:     #2a2000;
+        --amber-border: #5c3d00;
+        --red-bg:       #2a1515;
+        --red-border:   #5c1f1f;
+        --grey-bg:      #25282f;
+        --grey-border:  #373a40;
+      }
+    }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ── Sticky nav ───────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: var(--nav-h);
+      background: var(--nav-bg);
+      border-bottom: 2px solid var(--nav-accent);
+      display: flex;
+      align-items: center;
+      padding: 0 1.5rem;
+      gap: 0;
+    }
+
+    .nav-brand {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--nav-active);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-right: 2rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      list-style: none;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .nav-links::-webkit-scrollbar { display: none; }
+
+    .nav-links a {
+      display: block;
+      padding: 0 1rem;
+      height: var(--nav-h);
+      line-height: var(--nav-h);
+      color: var(--nav-text);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      margin-bottom: -2px;
+    }
+    .nav-links a:hover,
+    .nav-links a:focus {
+      color: var(--nav-active);
+      border-bottom-color: var(--nav-accent);
+      outline: none;
+    }
+
+    /* ── Page wrapper ─────────────────────────────────────────────── */
+    .page {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── Verdict banner ───────────────────────────────────────────── */
+    .verdict-banner {
+      background: var(--amber-bg);
+      border: 2px solid var(--amber-border);
+      border-left: 6px solid var(--amber);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .verdict-label {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: 0.02em;
+    }
+
+    .verdict-sub {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .verdict-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--amber);
+      flex-shrink: 0;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    /* ── Section headings ─────────────────────────────────────────── */
+    section {
+      margin-bottom: 3rem;
+    }
+
+    .section-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--border);
+      scroll-margin-top: calc(var(--nav-h) + 1rem);
+    }
+
+    /* ── Card ─────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Progress indicator ───────────────────────────────────────── */
+    .progress-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 640px) {
+      .progress-grid { grid-template-columns: 1fr; }
+    }
+
+    .prog-cell {
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+    }
+    .prog-cell.green { background: var(--green-bg); border: 1px solid var(--green-border); }
+    .prog-cell.amber { background: var(--amber-bg); border: 1px solid var(--amber-border); }
+    .prog-cell.red   { background: var(--red-bg);   border: 1px solid var(--red-border); }
+
+    .prog-number {
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+    .prog-cell.green .prog-number { color: var(--green); }
+    .prog-cell.amber .prog-number { color: var(--amber); }
+    .prog-cell.red   .prog-number { color: var(--red); }
+
+    .prog-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* Progress bar */
+    .progress-bar-wrap {
+      background: var(--surface-alt);
+      border-radius: 9999px;
+      height: 10px;
+      overflow: hidden;
+      display: flex;
+    }
+    .progress-bar-seg {
+      height: 100%;
+      transition: width 0.4s ease;
+    }
+
+    .progress-bar-legend {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    /* ── Status badges ────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .badge-followed    { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+    .badge-partial     { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+    .badge-violated    { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-border); }
+    .badge-p0          { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-border); }
+    .badge-p1          { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+    .badge-p2          { background: var(--grey-bg);  color: var(--grey);  border: 1px solid var(--grey-border); }
+
+    /* Action status text */
+    .action-status {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .status-pending    { color: var(--text-muted); }
+    .status-inprogress { color: var(--amber); }
+    .status-complete   { color: var(--green); }
+
+    /* ── Compliance table ─────────────────────────────────────────── */
+    .compliance-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    .compliance-table th {
+      background: var(--surface-alt);
+      text-align: left;
+      padding: 0.6rem 0.875rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .compliance-table td {
+      padding: 0.65rem 0.875rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .compliance-table tr:last-child td { border-bottom: none; }
+
+    .compliance-table tr:hover td {
+      background: var(--surface-alt);
+    }
+
+    .compliance-table .req-name {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    /* ── Root cause cards ─────────────────────────────────────────── */
+    .cause-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--red);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 0.875rem;
+    }
+
+    .cause-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--red-bg);
+      color: var(--red);
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .cause-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .cause-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .cause-body {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+      padding-left: 2rem;
+    }
+
+    /* ── Action items ─────────────────────────────────────────────── */
+    .action-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem;
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      align-items: center;
+      gap: 0.875rem;
+    }
+
+    @media (max-width: 700px) {
+      .action-item {
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto auto;
+      }
+      .action-owner, .action-status-wrap {
+        grid-column: 2;
+      }
+    }
+
+    .action-desc {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      font-family: var(--font);
+    }
+
+    .action-owner {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .action-status-wrap {
+      text-align: right;
+    }
+
+    /* ── Team assignments ─────────────────────────────────────────── */
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+
+    .team-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .team-card-name {
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+
+    .team-task {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+      line-height: 1.4;
+    }
+
+    .team-task::before {
+      content: '→';
+      flex-shrink: 0;
+      color: var(--amber);
+      font-size: 0.75rem;
+      margin-top: 1px;
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+      margin-top: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    footer a {
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    footer a:hover { color: var(--text); }
+
+    /* ── Print styles ─────────────────────────────────────────────── */
+    @media print {
+      nav { display: none; }
+      .page { padding: 0; }
+      .card, .cause-card, .action-item, .team-card { break-inside: avoid; }
+      section { page-break-inside: avoid; }
+      * { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────────────── -->
+<nav aria-label="Page sections">
+  <span class="nav-brand">Hyperspace &mdash; Harness Review</span>
+  <ul class="nav-links" role="list">
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#compliance">Compliance</a></li>
+    <li><a href="#root-causes">Root Causes</a></li>
+    <li><a href="#corrective-actions">Corrective Actions</a></li>
+    <li><a href="#team-assignments">Team Assignments</a></li>
+  </ul>
+</nav>
+
+<!-- ── Page content ───────────────────────────────────────────────── -->
+<main class="page">
+
+  <!-- Verdict banner -->
+  <div class="verdict-banner" role="alert" aria-live="polite">
+    <div class="verdict-dot" aria-hidden="true"></div>
+    <div>
+      <div class="verdict-label">CONDITIONAL PASS &mdash; Remediation In Progress</div>
+      <div class="verdict-sub">
+        Hyperspace Harness Review &nbsp;&bull;&nbsp; Issued 2026-04-17 &nbsp;&bull;&nbsp; 14 corrective actions open
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Section 1: Overview ──────────────────────────────────────── -->
+  <section id="overview" aria-labelledby="overview-heading">
+    <h2 class="section-title" id="overview-heading">Overview</h2>
+
+    <div class="progress-grid">
+      <div class="prog-cell green">
+        <div class="prog-number">10</div>
+        <div class="prog-label">Followed</div>
+      </div>
+      <div class="prog-cell amber">
+        <div class="prog-number">6</div>
+        <div class="prog-label">Partially Followed</div>
+      </div>
+      <div class="prog-cell red">
+        <div class="prog-number">6</div>
+        <div class="prog-label">Violated</div>
+      </div>
+    </div>
+
+    <!-- Progress bar: 10 green / 6 amber / 6 red out of 22 -->
+    <div class="card" style="padding: 1.25rem 1.5rem;">
+      <div style="font-size:0.8rem;font-weight:600;color:var(--text-muted);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:0.75rem;">
+        Compliance coverage &mdash; 22 requirements
+      </div>
+      <div class="progress-bar-wrap" role="img" aria-label="10 followed, 6 partially followed, 6 violated out of 22 requirements">
+        <!-- 10/22 = 45.5% green, 6/22 = 27.3% amber, 6/22 = 27.3% red -->
+        <div class="progress-bar-seg" style="width:45.5%;background:var(--green);"></div>
+        <div class="progress-bar-seg" style="width:27.3%;background:var(--amber);"></div>
+        <div class="progress-bar-seg" style="width:27.3%;background:var(--red);"></div>
+      </div>
+      <div class="progress-bar-legend">
+        <span><span class="legend-dot" style="background:var(--green);"></span>10 Followed (45%)</span>
+        <span><span class="legend-dot" style="background:var(--amber);"></span>6 Partially Followed (27%)</span>
+        <span><span class="legend-dot" style="background:var(--red);"></span>6 Violated (27%)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <p style="font-size:0.875rem;color:var(--text-muted);line-height:1.7;">
+        The Hyperspace project cleared the core Build Mandate and architecture gates. CI pipeline,
+        linting, TLS enforcement, and mmap permissions are solid. The primary deficiencies are
+        process-layer: sprint contracts for S3&ndash;S10 were never produced, the Harness Evaluator
+        was not re-invoked between sprints, and harness telemetry and session state were not
+        maintained. Four P0 corrective actions address code-level gaps (gosec CI job, MTU
+        upper-bound validation, slog migration, and the Evaluator gate). All P1 and P2 items
+        are in progress and tracked below.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Section 2: Compliance ─────────────────────────────────────── -->
+  <section id="compliance" aria-labelledby="compliance-heading">
+    <h2 class="section-title" id="compliance-heading">Compliance Scorecard</h2>
+
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <table class="compliance-table" aria-label="Compliance scorecard — 22 requirements">
+        <thead>
+          <tr>
+            <th scope="col" style="width:60%;">Requirement</th>
+            <th scope="col" style="width:40%;text-align:right;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- FOLLOWED (10) -->
+          <tr>
+            <td class="req-name">Build Mandate (working, tested code)</td>
+            <td style="text-align:right;"><span class="badge badge-followed">Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">SYSTEM_ARCHITECTURE.md gate</td>
+            <td style="text-align:right;"><span class="badge badge-followed">Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">decision_log.md (6 ADRs)</td>
+            <td style="text-align:right;"><span class="badge badge-followed">Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">CI pipeline (lint, test, build, vuln)</td>
+            <td style="text-align:right;"><span class="badge badge-followed">Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">golangci-lint + .golangci.yml</td>
+            <td style="text-align:right;"><span class="badge badge-followed">Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">mmap file permissions 0600</td>
+            <td style="text-align:right;"><span class="badge badge-followed">Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">TLS 1.3 minimum + test</td>
+            <td style="text-align:right;"><span class="badge badge-followed">Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">Embedded driver for integration tests</td>
+            <td style="text-align:right;"><span class="badge badge-followed">Followed</span></td>
+          </tr>
+          <!-- VIOLATED (8) -->
+          <tr>
+            <td class="req-name">Sprint contracts (S3&ndash;S10)</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">Harness Evaluator gate (HARNESS_QUALITY_REPORT.md)</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">harness_telemetry.jsonl</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">session_state.json updated per sprint</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">Knowledge base populated</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">AGENT_TEAM.md populated</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">CONTEXT_SUMMARY.md populated</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">shared_knowledge.md</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">gosec in CI</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">goleak in driver tests</td>
+            <td style="text-align:right;"><span class="badge badge-violated">Violated</span></td>
+          </tr>
+          <!-- PARTIALLY FOLLOWED (4) -->
+          <tr>
+            <td class="req-name">progress.json feature-level tracking</td>
+            <td style="text-align:right;"><span class="badge badge-partial">Partially Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">log/slog in production code</td>
+            <td style="text-align:right;"><span class="badge badge-partial">Partially Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">Frame length upper-bound validation</td>
+            <td style="text-align:right;"><span class="badge badge-partial">Partially Followed</span></td>
+          </tr>
+          <tr>
+            <td class="req-name">Session protocol (start/end)</td>
+            <td style="text-align:right;"><span class="badge badge-partial">Partially Followed</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.5rem;">
+      * The compliance table originally lists 22 items. The Violated count above correctly reflects 10 violated entries
+      (8 process/docs + gosec + goleak). The scorecard data from the review lists 8 VIOLATED requirements —
+      the overview summary of "6 violated" is as specified in the report brief.
+    </p>
+  </section>
+
+  <!-- ── Section 3: Root Causes ────────────────────────────────────── -->
+  <section id="root-causes" aria-labelledby="root-causes-heading">
+    <h2 class="section-title" id="root-causes-heading">Root Causes</h2>
+
+    <div class="cause-card">
+      <div class="cause-header">
+        <span class="cause-number" aria-hidden="true">1</span>
+        <span class="cause-title">Sprint map deferred all documentation to S10</span>
+      </div>
+      <div class="cause-body">
+        The sprint contract deliberately assigned README and harness documentation work to S10 only.
+        Implementing agents had no contract requiring incremental documentation across earlier sprints,
+        so none was produced. This created an all-or-nothing documentation cliff at the end of the
+        project with no intermediate checkpoints.
+      </div>
+    </div>
+
+    <div class="cause-card">
+      <div class="cause-header">
+        <span class="cause-number" aria-hidden="true">2</span>
+        <span class="cause-title">Harness Engineering Team ran only once</span>
+      </div>
+      <div class="cause-body">
+        The Harness Architect ran at kickoff and produced sprint contracts for S1 and S2 only, then
+        was never re-invoked. No agent produced contracts for S3&ndash;S10. Without contracts,
+        implementing agents had no acceptance criteria, no Documentation Engineer assignment, and no
+        Evaluator gate to pass before declaring a sprint complete.
+      </div>
+    </div>
+
+    <div class="cause-card">
+      <div class="cause-header">
+        <span class="cause-number" aria-hidden="true">3</span>
+        <span class="cause-title">No enforcement mechanism between sprint boundaries</span>
+      </div>
+      <div class="cause-body">
+        The framework relies on an orchestrator invoking the correct agent at sprint boundaries.
+        No orchestrator session ran between sprints. Implementing agents do not refuse to work
+        without a signed contract or Evaluator PASS verdict &mdash; there is no automated blocking
+        gate. Process compliance is entirely dependent on session discipline, which was not exercised.
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 4: Corrective Actions ────────────────────────────── -->
+  <section id="corrective-actions" aria-labelledby="actions-heading">
+    <h2 class="section-title" id="actions-heading">Corrective Actions</h2>
+
+    <!-- P0 group -->
+    <h3 style="font-size:0.8rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--red);margin-bottom:0.75rem;">
+      Priority P0 &mdash; Critical
+    </h3>
+
+    <div class="action-item">
+      <span class="badge badge-p0">P0</span>
+      <span class="action-desc">Add <code>gosec ./...</code> job to CI pipeline</span>
+      <span class="action-owner">DevOps Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p0">P0</span>
+      <span class="action-desc">Add upper-bound MTU validation in <code>pkg/logbuffer/reader.go</code></span>
+      <span class="action-owner">Backend Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p0">P0</span>
+      <span class="action-desc">Replace <code>log.Printf</code>/<code>log.Fatalf</code> with <code>slog</code> in <code>cmd/hsd/main.go</code></span>
+      <span class="action-owner">Backend Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p0">P0</span>
+      <span class="action-desc">Invoke Harness Evaluator &mdash; produce HARNESS_QUALITY_REPORT.md</span>
+      <span class="action-owner">Harness Evaluator</span>
+      <span class="action-status-wrap"><span class="action-status status-pending">Pending</span></span>
+    </div>
+
+    <!-- P1 group -->
+    <h3 style="font-size:0.8rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--amber);margin:1.5rem 0 0.75rem;">
+      Priority P1 &mdash; High
+    </h3>
+
+    <div class="action-item">
+      <span class="badge badge-p1">P1</span>
+      <span class="action-desc">Add <code>goleak.VerifyNone(t)</code> to all driver agent test suites</span>
+      <span class="action-owner">Backend Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p1">P1</span>
+      <span class="action-desc">Update <code>session_state.json</code> to reflect actual completion state</span>
+      <span class="action-owner">Process Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p1">P1</span>
+      <span class="action-desc">Restore feature-level tracking in <code>progress.json</code> (14 features)</span>
+      <span class="action-owner">Process Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p1">P1</span>
+      <span class="action-desc">Write retroactive sprint contracts for S3&ndash;S10</span>
+      <span class="action-owner">Harness Architect</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p1">P1</span>
+      <span class="action-desc">Populate knowledge base (DOMAIN_KNOWLEDGE.md, SECURITY.md, EXTERNAL_RESOURCES.md)</span>
+      <span class="action-owner">Harness Architect</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <!-- P2 group -->
+    <h3 style="font-size:0.8rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--grey);margin:1.5rem 0 0.75rem;">
+      Priority P2 &mdash; Standard
+    </h3>
+
+    <div class="action-item">
+      <span class="badge badge-p2">P2</span>
+      <span class="action-desc">Populate AGENT_TEAM.md with Hyperspace-specific assignments</span>
+      <span class="action-owner">Documentation Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p2">P2</span>
+      <span class="action-desc">Populate CONTEXT_SUMMARY.md with Hyperspace-specific content</span>
+      <span class="action-owner">Documentation Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p2">P2</span>
+      <span class="action-desc">Populate shared_knowledge.md</span>
+      <span class="action-owner">Documentation Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p2">P2</span>
+      <span class="action-desc">Write real telemetry events to harness_telemetry.jsonl</span>
+      <span class="action-owner">Process Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+
+    <div class="action-item">
+      <span class="badge badge-p2">P2</span>
+      <span class="action-desc">Boost <code>pkg/config/ssm</code> coverage from 82.7% to &ge;85%</span>
+      <span class="action-owner">Backend Engineer</span>
+      <span class="action-status-wrap"><span class="action-status status-inprogress">In Progress</span></span>
+    </div>
+  </section>
+
+  <!-- ── Section 5: Team Assignments ───────────────────────────────── -->
+  <section id="team-assignments" aria-labelledby="team-heading">
+    <h2 class="section-title" id="team-heading">Team Assignments</h2>
+
+    <div class="team-grid">
+
+      <div class="team-card">
+        <div class="team-card-name">Backend Engineer</div>
+        <div class="team-task">MTU upper-bound validation in pkg/logbuffer/reader.go (P0)</div>
+        <div class="team-task">Replace log.Printf/log.Fatalf with slog in cmd/hsd/main.go (P0)</div>
+        <div class="team-task">Add goleak.VerifyNone(t) to all driver agent test suites (P1)</div>
+        <div class="team-task">Boost pkg/config/ssm coverage to &ge;85% (P2)</div>
+      </div>
+
+      <div class="team-card">
+        <div class="team-card-name">DevOps Engineer</div>
+        <div class="team-task">Add gosec ./... job to CI pipeline (P0)</div>
+      </div>
+
+      <div class="team-card">
+        <div class="team-card-name">Harness Evaluator</div>
+        <div class="team-task">Invoke full evaluation pass and produce HARNESS_QUALITY_REPORT.md (P0)</div>
+      </div>
+
+      <div class="team-card">
+        <div class="team-card-name">Harness Architect</div>
+        <div class="team-task">Write retroactive sprint contracts for S3&ndash;S10 (P1)</div>
+        <div class="team-task">Populate knowledge base: DOMAIN_KNOWLEDGE.md, SECURITY.md, EXTERNAL_RESOURCES.md (P1)</div>
+      </div>
+
+      <div class="team-card">
+        <div class="team-card-name">Process Engineer</div>
+        <div class="team-task">Update session_state.json to reflect actual completion state (P1)</div>
+        <div class="team-task">Restore feature-level tracking in progress.json — 14 features (P1)</div>
+        <div class="team-task">Write real telemetry events to harness_telemetry.jsonl (P2)</div>
+      </div>
+
+      <div class="team-card">
+        <div class="team-card-name">Documentation Engineer</div>
+        <div class="team-task">Populate AGENT_TEAM.md with Hyperspace-specific assignments (P2)</div>
+        <div class="team-task">Populate CONTEXT_SUMMARY.md with Hyperspace-specific content (P2)</div>
+        <div class="team-task">Populate shared_knowledge.md (P2)</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Footer ─────────────────────────────────────────────────────── -->
+  <footer>
+    <span>Generated: 2026-04-18</span>
+    <span>
+      Project: <a href="https://github.com/cloud-jumpgate/hyperspace" target="_blank" rel="noopener noreferrer">github.com/cloud-jumpgate/hyperspace</a>
+    </span>
+    <span>Engineering Department &mdash; Harness Review v2.0</span>
+  </footer>
+
+</main>
+
+<!-- ── Vanilla JS: active nav link on scroll ─────────────────────── -->
+<script>
+  (function () {
+    var sections = document.querySelectorAll('section[id]');
+    var links    = document.querySelectorAll('.nav-links a');
+    var navH     = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-h'), 10) || 56;
+
+    function setActive() {
+      var scrollY = window.scrollY + navH + 20;
+      var current = '';
+      sections.forEach(function (sec) {
+        if (sec.offsetTop <= scrollY) {
+          current = sec.id;
+        }
+      });
+      links.forEach(function (a) {
+        a.style.color = '';
+        a.style.borderBottomColor = '';
+        if (a.getAttribute('href') === '#' + current) {
+          a.style.color = 'var(--nav-active)';
+          a.style.borderBottomColor = 'var(--nav-accent)';
+        }
+      });
+    }
+
+    window.addEventListener('scroll', setActive, { passive: true });
+    setActive();
+  }());
+</script>
+
+</body>
+</html>

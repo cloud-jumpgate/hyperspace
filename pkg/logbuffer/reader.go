@@ -45,6 +45,10 @@ func (r *TermReader) Read(
 		}
 
 		alignedLen := int32(AlignedLength(int(frameLen)))
+		if int64(offset)+int64(alignedLen) > int64(capacity) {
+			// Corrupt frame — aligned extent would read past buffer end.
+			break
+		}
 
 		frameType := hdr.FrameType()
 		if frameType != FrameTypePAD {
