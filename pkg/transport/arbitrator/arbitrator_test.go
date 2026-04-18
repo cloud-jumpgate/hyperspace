@@ -379,3 +379,44 @@ func TestHybrid_NoPanic_ExtremeValues(t *testing.T) {
 	_, err = a.Pick(conns(c2), 0, 0)
 	require.NoError(t, err)
 }
+
+// --- Sticky Remove (C-08 fix) ------------------------------------------------
+
+func TestSticky_Remove_CleansUpPin(t *testing.T) {
+	a := arbitrator.NewSticky(0.5)
+	c1 := newMockConn(1, ms(10), 0, 0, 0)
+	c2 := newMockConn(2, ms(20), 0, 0, 0)
+	cs := conns(c1, c2)
+
+	// Pick pins publication 42 to c1 (best RTT).
+	picked, err := a.Pick(cs, 42, 0)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(1), picked.ID())
+	assert.Equal(t, 1, a.PinCount())
+
+	// Remove publication 42.
+	a.Remove(42)
+	assert.Equal(t, 0, a.PinCount())
+
+	// Next Pick for publication 42 should re-pin (to best = c1 still).
+	picked2, err := a.Pick(cs, 42, 0)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(1), picked2.ID())
+	assert.Equal(t, 1, a.PinCount())
+}
+
+func TestSticky_Remove_NoGrowAfterCycles(t *testing.T) {
+	a := arbitrator.NewSticky(0.5)
+	c1 := newMockConn(1, ms(10), 0, 0, 0)
+	cs := conns(c1)
+
+	// Add and remove 100 publications.
+	for i := range 100 {
+		pubID := int64(i + 1)
+		_, _ = a.Pick(cs, pubID, 0)
+		a.Remove(pubID)
+	}
+
+	// Pin count should be 0 after all removals.
+	assert.Equal(t, 0, a.PinCount())
+}

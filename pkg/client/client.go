@@ -351,10 +351,21 @@ func (c *Client) Close() error {
 	return nil
 }
 
+// Adaptive backoff constants for pollBroadcast (A-05 fix).
+const (
+	pollMinSleep       = 100 * time.Microsecond // initial/active sleep
+	pollMaxSleep       = 1 * time.Millisecond   // maximum idle sleep
+	pollIdleThreshold  = 10                     // idle cycles before increasing sleep
+)
+
 // pollBroadcast continuously reads from the broadcast receiver and dispatches
 // responses to waiting requests. Runs in its own goroutine until ctx is cancelled.
+// A-05 fix: adaptive backoff -- starts at 100us, increases to 1ms after 10 idle cycles.
 func (c *Client) pollBroadcast(ctx context.Context) {
 	defer close(c.pollDone)
+
+	idleCount := 0
+	sleepDur := pollMinSleep
 
 	for {
 		select {
@@ -367,18 +378,28 @@ func (c *Client) pollBroadcast(ctx context.Context) {
 			c.dispatchResponse(msgTypeID, buf, offset, length)
 		})
 		if err != nil {
-			// ErrLapped: we missed messages; log and continue.
-			slog.Warn("client: broadcast receiver lapped — messages missed", "error", err)
+			// ErrLapped: we missed messages; log and reconcile (A-04 fix).
+			slog.Warn("client: broadcast receiver lapped -- messages missed", "error", err)
+			c.reconcileAfterLap()
+			idleCount = 0
+			sleepDur = pollMinSleep
 			continue
 		}
-		if !got {
-			// Nothing available; yield.
+		if got {
+			// Reset backoff on any received message.
+			idleCount = 0
+			sleepDur = pollMinSleep
+		} else {
+			// Nothing available; adaptive yield (A-05 fix).
+			idleCount++
+			if idleCount >= pollIdleThreshold && sleepDur < pollMaxSleep {
+				sleepDur = pollMaxSleep
+			}
 			select {
 			case <-ctx.Done():
 				return
 			default:
-				// Brief yield to avoid burning a core while idle.
-				time.Sleep(100 * time.Microsecond)
+				time.Sleep(sleepDur)
 			}
 		}
 	}
@@ -409,6 +430,82 @@ func (c *Client) dispatchResponse(msgTypeID int32, buf *atomicbuf.AtomicBuffer, 
 		case req.ch <- response{msgTypeID: msgTypeID, payload: raw}:
 		default:
 		}
+	}
+}
+
+// reconcileAfterLap re-queries conductor state to detect missed RspPublicationReady
+// or RspSubscriptionReady responses after the broadcast receiver was lapped (A-04 fix).
+// For each pending request whose correlationID matches a conductor publication or
+// subscription, we synthesise the response as if the broadcast had been received.
+func (c *Client) reconcileAfterLap() {
+	if c.drv == nil {
+		return
+	}
+
+	cond := c.drv.Conductor()
+	pubs := cond.Publications()
+	subs := cond.Subscriptions()
+
+	c.mu.Lock()
+	// Build a map of pending correlation IDs for fast lookup.
+	pendingIDs := make(map[int64]*pendingRequest, len(c.pending))
+	for id, req := range c.pending {
+		pendingIDs[id] = req
+	}
+	c.mu.Unlock()
+
+	reconciled := 0
+
+	// Check publications: if conductor has a publication for a pending correlationID,
+	// the RspPublicationReady was missed. Synthesise it.
+	for _, pub := range pubs {
+		req, ok := pendingIDs[pub.PublicationID]
+		if !ok {
+			continue
+		}
+		// Synthesise RspPublicationReady payload: correlationID(8) + sessionID(4) + streamID(4).
+		payload := make([]byte, 16)
+		binary.LittleEndian.PutUint64(payload[0:], uint64(pub.PublicationID))
+		binary.LittleEndian.PutUint32(payload[8:], uint32(pub.SessionID))
+		binary.LittleEndian.PutUint32(payload[12:], uint32(pub.StreamID))
+
+		c.mu.Lock()
+		delete(c.pending, pub.PublicationID)
+		c.mu.Unlock()
+
+		select {
+		case req.ch <- response{msgTypeID: conductor.RspPublicationReady, payload: payload}:
+			reconciled++
+		default:
+		}
+	}
+
+	// Check subscriptions: if conductor has a subscription for a pending correlationID,
+	// the RspSubscriptionReady was missed.
+	for _, sub := range subs {
+		req, ok := pendingIDs[sub.SubscriptionID]
+		if !ok {
+			continue
+		}
+		payload := make([]byte, 12)
+		binary.LittleEndian.PutUint64(payload[0:], uint64(sub.SubscriptionID))
+		binary.LittleEndian.PutUint32(payload[8:], uint32(sub.StreamID))
+
+		c.mu.Lock()
+		delete(c.pending, sub.SubscriptionID)
+		c.mu.Unlock()
+
+		select {
+		case req.ch <- response{msgTypeID: conductor.RspSubscriptionReady, payload: payload}:
+			reconciled++
+		default:
+		}
+	}
+
+	if reconciled > 0 {
+		slog.Info("client: reconciled missed responses after broadcast lap",
+			"reconciled", reconciled,
+		)
 	}
 }
 

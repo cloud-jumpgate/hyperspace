@@ -145,7 +145,7 @@ func enforceALPN(tlsConf *tls.Config) *tls.Config {
 // Dial opens a new outgoing QUIC connection to addr using the given TLS config.
 // ccName determines which congestion controller to use (currently informational;
 // future: passed to cc.New for custom CC integration).
-func Dial(ctx context.Context, addr string, tlsConf *tls.Config, ccName string) (*QUICConnection, error) {
+func Dial(ctx context.Context, addr string, tlsConf *tls.Config, ccName string) (Connection, error) {
 	if err := validateTLSConfig(tlsConf); err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func Dial(ctx context.Context, addr string, tlsConf *tls.Config, ccName string) 
 }
 
 // Accept wraps an incoming quic-go connection.
-func Accept(conn *quic.Conn) *QUICConnection {
+func Accept(conn *quic.Conn) Connection {
 	return newQUICConnection(conn)
 }
 

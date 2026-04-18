@@ -256,6 +256,72 @@
       "coverage_pct": 92,
       "pr_number": 10,
       "notes": "Fix: use composite key (sessionID, streamID) as uint64 for image map instead of sessionID alone."
+    },
+    {
+      "id": "F-024",
+      "name": "Transport Connection Interface (F-01)",
+      "sprint": "S13",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": 11,
+      "notes": "Dial/Accept return Connection interface. All consumers already referenced interface."
+    },
+    {
+      "id": "F-025",
+      "name": "Config Externalisation (F-02)",
+      "sprint": "S13",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": 11,
+      "notes": "Sender fragmentsPerBatch via functional option. Conductor constants exported as defaults."
+    },
+    {
+      "id": "F-026",
+      "name": "Broadcast Lapping Reconciliation (A-04)",
+      "sprint": "S13",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": null,
+      "coverage_pct": 91,
+      "pr_number": 11,
+      "notes": "reconcileAfterLap re-queries conductor state to synthesise missed responses."
+    },
+    {
+      "id": "F-027",
+      "name": "Lock-Free Conductor Reads (P-03)",
+      "sprint": "S13",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": null,
+      "coverage_pct": 92,
+      "pr_number": 11,
+      "notes": "Publications()/Subscriptions() use sync/atomic.Pointer for lock-free reads."
+    },
+    {
+      "id": "F-028",
+      "name": "Sticky Arbitrator Pin Cleanup (C-08)",
+      "sprint": "S13",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": 11,
+      "notes": "StickyArbitrator.Remove(publicationID) prevents unbounded pin map growth."
+    },
+    {
+      "id": "F-029",
+      "name": "Adaptive pollBroadcast Backoff (A-05)",
+      "sprint": "S13",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": null,
+      "coverage_pct": 91,
+      "pr_number": 11,
+      "notes": "Adaptive backoff 100us to 1ms after 10 idle cycles. Resets on message receipt."
     }
   ],
   "_status_values": [

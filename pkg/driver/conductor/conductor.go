@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"sync"
+	syncatomic "sync/atomic"
 	"time"
 
 	"github.com/cloud-jumpgate/hyperspace/internal/atomic"
@@ -36,13 +37,13 @@ const (
 	RspError              = int32(105)
 )
 
-// maxCommandsPerCycle is the maximum commands processed per DoWork call.
-const maxCommandsPerCycle = 10
+// DefaultMaxCommandsPerCycle is the default maximum commands processed per DoWork call.
+const DefaultMaxCommandsPerCycle = 10
 
-// broadcastMaxPayload is the fixed maximum payload for broadcast messages.
+// DefaultBroadcastMaxPayload is the default maximum payload for broadcast messages.
 // Sized to fit the largest response: correlationID(8) + sessionID(4) + streamID(4) +
 // channel string (up to 256 bytes) = 272. Use 512 for headroom.
-const broadcastMaxPayload = 512
+const DefaultBroadcastMaxPayload = 512
 
 // PublicationState holds live state for one publication.
 type PublicationState struct {
@@ -72,15 +73,19 @@ type ImageState struct {
 
 // Conductor is the driver control plane agent.
 type Conductor struct {
-	toDriverRing  *ringbuffer.ManyToOneRingBuffer
-	fromDriverTx  *broadcast.Transmitter
-	publications  map[int64]*PublicationState
-	subscriptions map[int64]*SubscriptionState
-	mu            sync.Mutex // only for external Admin() calls; DoWork is single-threaded
-	nextCorrID    int64
-	termLength    int
-	clientAlive   map[int64]time.Time // correlationID → last keepalive time
-	rng           *rand.Rand
+	toDriverRing     *ringbuffer.ManyToOneRingBuffer
+	fromDriverTx     *broadcast.Transmitter
+	publications     map[int64]*PublicationState
+	subscriptions    map[int64]*SubscriptionState
+	mu               sync.Mutex // only for external Admin() calls; DoWork is single-threaded
+	nextCorrID       int64
+	termLength       int
+	maxCmdsPerCycle  int                   // F-02 fix: configurable max commands per DoWork
+	clientAlive      map[int64]time.Time   // correlationID → last keepalive time
+	rng              *rand.Rand
+	// Lock-free publication/subscription snapshots (P-03 fix).
+	pubSnap  syncatomic.Pointer[[]*PublicationState]
+	subSnap  syncatomic.Pointer[[]*SubscriptionState]
 }
 
 // New creates a Conductor.
@@ -92,20 +97,27 @@ func New(toDriverBuf, fromDriverBuf *atomic.AtomicBuffer, termLength int) (*Cond
 	if err != nil {
 		return nil, err
 	}
-	tx, err := broadcast.NewTransmitter(fromDriverBuf, broadcastMaxPayload)
+	tx, err := broadcast.NewTransmitter(fromDriverBuf, DefaultBroadcastMaxPayload)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Conductor{
-		toDriverRing:  ring,
-		fromDriverTx:  tx,
-		publications:  make(map[int64]*PublicationState),
-		subscriptions: make(map[int64]*SubscriptionState),
-		clientAlive:   make(map[int64]time.Time),
-		termLength:    termLength,
-		rng:           rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec
-	}, nil
+	c := &Conductor{
+		toDriverRing:    ring,
+		fromDriverTx:    tx,
+		publications:    make(map[int64]*PublicationState),
+		subscriptions:   make(map[int64]*SubscriptionState),
+		clientAlive:     make(map[int64]time.Time),
+		termLength:      termLength,
+		maxCmdsPerCycle: DefaultMaxCommandsPerCycle,
+		rng:             rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec
+	}
+	// Initialise lock-free snapshots (P-03 fix).
+	emptyPubs := make([]*PublicationState, 0)
+	emptySubs := make([]*SubscriptionState, 0)
+	c.pubSnap.Store(&emptyPubs)
+	c.subSnap.Store(&emptySubs)
+	return c, nil
 }
 
 // DoWork reads up to 10 commands from the ring buffer and processes each.
@@ -115,7 +127,7 @@ func (c *Conductor) DoWork(_ context.Context) int {
 	c.toDriverRing.Read(func(msgTypeID int32, buf *atomic.AtomicBuffer, offset, length int) {
 		c.processCommand(msgTypeID, buf, offset, length)
 		count++
-	}, maxCommandsPerCycle)
+	}, c.maxCmdsPerCycle)
 	return count
 }
 
@@ -128,30 +140,41 @@ func (c *Conductor) Close() error {
 	defer c.mu.Unlock()
 	c.publications = make(map[int64]*PublicationState)
 	c.subscriptions = make(map[int64]*SubscriptionState)
+	c.publishPubSnapshot()
+	c.publishSubSnapshot()
 	return nil
 }
 
 // Publications returns a snapshot of current publication states (for Sender).
-// Safe to call from another goroutine (uses mutex).
+// P-03 fix: lock-free read via atomic.Pointer. No mutex on the hot path.
 func (c *Conductor) Publications() []*PublicationState {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	return *c.pubSnap.Load()
+}
+
+// Subscriptions returns a snapshot of current subscription states (for Receiver).
+// P-03 fix: lock-free read via atomic.Pointer. No mutex on the hot path.
+func (c *Conductor) Subscriptions() []*SubscriptionState {
+	return *c.subSnap.Load()
+}
+
+// publishPubSnapshot rebuilds and atomically publishes the publication snapshot.
+// Called after any mutation to c.publications (under c.mu).
+func (c *Conductor) publishPubSnapshot() {
 	snap := make([]*PublicationState, 0, len(c.publications))
 	for _, p := range c.publications {
 		snap = append(snap, p)
 	}
-	return snap
+	c.pubSnap.Store(&snap)
 }
 
-// Subscriptions returns a snapshot of current subscription states (for Receiver).
-func (c *Conductor) Subscriptions() []*SubscriptionState {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// publishSubSnapshot rebuilds and atomically publishes the subscription snapshot.
+// Called after any mutation to c.subscriptions (under c.mu).
+func (c *Conductor) publishSubSnapshot() {
 	snap := make([]*SubscriptionState, 0, len(c.subscriptions))
 	for _, s := range c.subscriptions {
 		snap = append(snap, s)
 	}
-	return snap
+	c.subSnap.Store(&snap)
 }
 
 // processCommand dispatches a single command from the ring buffer.
@@ -249,6 +272,7 @@ func (c *Conductor) handleAddPublication(buf *atomic.AtomicBuffer, offset, lengt
 
 	c.mu.Lock()
 	c.publications[correlationID] = pub
+	c.publishPubSnapshot()
 	c.mu.Unlock()
 
 	slog.Info("conductor: publication added",
@@ -272,6 +296,7 @@ func (c *Conductor) handleRemovePublication(buf *atomic.AtomicBuffer, offset, le
 	_, ok := c.publications[pubID]
 	if ok {
 		delete(c.publications, pubID)
+		c.publishPubSnapshot()
 	}
 	c.mu.Unlock()
 
@@ -304,6 +329,7 @@ func (c *Conductor) handleAddSubscription(buf *atomic.AtomicBuffer, offset, leng
 
 	c.mu.Lock()
 	c.subscriptions[correlationID] = sub
+	c.publishSubSnapshot()
 	c.mu.Unlock()
 
 	slog.Info("conductor: subscription added",
@@ -326,6 +352,7 @@ func (c *Conductor) handleRemoveSubscription(buf *atomic.AtomicBuffer, offset, l
 	_, ok := c.subscriptions[subID]
 	if ok {
 		delete(c.subscriptions, subID)
+		c.publishSubSnapshot()
 	}
 	c.mu.Unlock()
 
