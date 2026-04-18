@@ -137,6 +137,84 @@ func TestSSMLoader_New_Compiles(t *testing.T) {
 	assert.NotNil(t, l)
 }
 
+func TestSSMLoader_InvalidProbeIntervalMs(t *testing.T) {
+	clearEnv(t)
+
+	mock := &mockSSMClient{
+		values: map[string]string{
+			"/hyperspace/prod/sender/probe_interval_ms": "not-a-number",
+		},
+	}
+
+	l := ssm.NewWithClient(mock, "prod", "sender")
+	_, err := l.Load(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "probe_interval_ms")
+}
+
+func TestSSMLoader_NilParameterValue(t *testing.T) {
+	clearEnv(t)
+
+	// Return a GetParameterOutput with a nil Parameter.Value — getString returns ("", false, nil).
+	mock := &nilValueSSMClient{}
+	l := ssm.NewWithClient(mock, "prod", "sender")
+	cfg, err := l.Load(context.Background())
+	require.NoError(t, err)
+	// All values fall back to defaults since parameter value is nil.
+	assert.Equal(t, "prod", cfg.Env)
+	assert.Equal(t, "sender", cfg.Role)
+}
+
+func TestSSMLoader_APIErrorOnCCAlgorithm(t *testing.T) {
+	clearEnv(t)
+
+	// pool_size succeeds, then all others return an API error.
+	mock := &partialErrSSMClient{
+		okValues: map[string]string{
+			"/hyperspace/prod/sender/pool_size": "4",
+		},
+		errAfterOK: errors.New("network timeout"),
+	}
+
+	l := ssm.NewWithClient(mock, "prod", "sender")
+	_, err := l.Load(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "network timeout")
+}
+
+// nilValueSSMClient returns a non-nil output but with Parameter.Value == nil.
+type nilValueSSMClient struct{}
+
+func (n *nilValueSSMClient) GetParameter(
+	_ context.Context,
+	_ *awsssm.GetParameterInput,
+	_ ...func(*awsssm.Options),
+) (*awsssm.GetParameterOutput, error) {
+	return &awsssm.GetParameterOutput{
+		Parameter: &types.Parameter{Value: nil},
+	}, nil
+}
+
+// partialErrSSMClient succeeds for keys in okValues; returns errAfterOK for everything else.
+type partialErrSSMClient struct {
+	okValues   map[string]string
+	errAfterOK error
+}
+
+func (p *partialErrSSMClient) GetParameter(
+	_ context.Context,
+	params *awsssm.GetParameterInput,
+	_ ...func(*awsssm.Options),
+) (*awsssm.GetParameterOutput, error) {
+	path := aws.ToString(params.Name)
+	if v, ok := p.okValues[path]; ok {
+		return &awsssm.GetParameterOutput{
+			Parameter: &types.Parameter{Value: aws.String(v)},
+		}, nil
+	}
+	return nil, p.errAfterOK
+}
+
 func clearEnv(t *testing.T) {
 	t.Helper()
 	vars := []string{
