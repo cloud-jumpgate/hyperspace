@@ -617,3 +617,150 @@ func TestNewPoolManagerNilDialer(t *testing.T) {
 	defer func() { _ = mgr.Close() }()
 	assert.NotNil(t, mgr)
 }
+
+// ---------------------------------------------------------------------------
+// Health Check tests (A-02 fix)
+// ---------------------------------------------------------------------------
+
+// TestHealthCheck_DetectsClosedConnection — closed connection is removed from pool.
+// Note: pool.Connections() already prunes closed connections via pruneClosedLocked(),
+// so the health check's IsClosed loop is a defensive backup. The primary effect is
+// that pool.Size() decreases and the pool may fall below minimum, triggering reconnection.
+func TestHealthCheck_DetectsClosedConnection(t *testing.T) {
+	d := &mockDialer{rtt: 50 * time.Microsecond}
+	mgr, p, _ := makePoolMgr(t, 2, 8, d, 10*time.Second)
+
+	c1 := newMockConn(50 * time.Microsecond)
+	c2 := newMockConn(55 * time.Microsecond)
+	c3 := newMockConn(60 * time.Microsecond)
+	_ = p.Add(c1)
+	_ = p.Add(c2)
+	_ = p.Add(c3)
+	assert.Equal(t, 3, p.Size())
+
+	// Close c2 to simulate a dead connection.
+	_ = c2.Close()
+
+	// Call healthCheck directly to avoid ticker timing issues.
+	mgr.healthCheck(context.Background())
+
+	// c2 should have been removed (by pool's built-in pruning or by healthCheck).
+	// Pool should be at 2, and since 2 >= min(2), no reconnection attempt needed.
+	assert.Equal(t, 2, p.Size(), "closed connection should be removed")
+	assert.Equal(t, 0, d.count(), "no dial needed since pool is still >= min")
+}
+
+// TestHealthCheck_ReconnectsWhenUnderMin — health check attempts reconnection
+// when pool falls below minimum after removing closed connections.
+func TestHealthCheck_ReconnectsWhenUnderMin(t *testing.T) {
+	d := &mockDialer{rtt: 50 * time.Microsecond}
+	mgr, p, _ := makePoolMgr(t, 3, 8, d, 10*time.Second)
+
+	c1 := newMockConn(50 * time.Microsecond)
+	c2 := newMockConn(55 * time.Microsecond)
+	c3 := newMockConn(60 * time.Microsecond)
+	_ = p.Add(c1)
+	_ = p.Add(c2)
+	_ = p.Add(c3)
+	assert.Equal(t, 3, p.Size())
+
+	// Close two connections to drop below min=3.
+	_ = c2.Close()
+	_ = c3.Close()
+
+	mgr.healthCheck(context.Background())
+
+	// After health check: 2 closed connections removed, pool was at 1 (under min=3),
+	// dialer should have been called to reconnect back to min.
+	assert.GreaterOrEqual(t, p.Size(), 3, "pool should be restored to min size")
+	assert.GreaterOrEqual(t, d.count(), 2, "dialer should have been called to restore pool")
+}
+
+// TestHealthCheck_ExponentialBackoff — consecutive failures increase backoff delay.
+func TestHealthCheck_ExponentialBackoff(t *testing.T) {
+	mgr := &PoolManager{
+		reconnectBaseDelay: 100 * time.Millisecond,
+		reconnectMaxDelay:  10 * time.Second,
+	}
+
+	// No failures → no delay.
+	mgr.consecutiveFailures = 0
+	assert.Equal(t, time.Duration(0), mgr.backoffDelay())
+
+	// 1 failure → base delay (100ms).
+	mgr.consecutiveFailures = 1
+	assert.Equal(t, 100*time.Millisecond, mgr.backoffDelay())
+
+	// 2 failures → 200ms.
+	mgr.consecutiveFailures = 2
+	assert.Equal(t, 200*time.Millisecond, mgr.backoffDelay())
+
+	// 3 failures → 400ms.
+	mgr.consecutiveFailures = 3
+	assert.Equal(t, 400*time.Millisecond, mgr.backoffDelay())
+
+	// Many failures → capped at max.
+	mgr.consecutiveFailures = 20
+	assert.Equal(t, 10*time.Second, mgr.backoffDelay())
+}
+
+// TestHealthCheck_PoolDrainedToZero — logs ErrNoConnections when pool reaches zero.
+func TestHealthCheck_PoolDrainedToZero(t *testing.T) {
+	d := &mockDialer{rtt: 50 * time.Microsecond}
+	mgr, p, _ := makePoolMgr(t, 2, 8, d, 10*time.Second)
+
+	c1 := newMockConn(50 * time.Microsecond)
+	_ = p.Add(c1)
+
+	// Close the only connection.
+	_ = c1.Close()
+
+	mgr.healthCheck(context.Background())
+
+	// After removing the closed connection, pool is at 0. Health check should
+	// attempt reconnection to bring it back to min.
+	assert.GreaterOrEqual(t, p.Size(), 2, "pool should be restored from zero")
+	assert.GreaterOrEqual(t, d.count(), 2, "dialer should have been called")
+}
+
+// TestHealthCheck_ReconnectDialerFailsAllRetries — dialer fails on all retries.
+func TestHealthCheck_ReconnectDialerFailsAllRetries(t *testing.T) {
+	d := &mockDialer{err: assert.AnError, rtt: 50 * time.Microsecond}
+	mgr, p, _ := makePoolMgr(t, 2, 8, d, 10*time.Second)
+	// Override backoff to be fast for tests.
+	mgr.reconnectBaseDelay = 1 * time.Millisecond
+	mgr.reconnectMaxDelay = 5 * time.Millisecond
+
+	c1 := newMockConn(50 * time.Microsecond)
+	_ = p.Add(c1)
+
+	// Close connection to trigger reconnect.
+	_ = c1.Close()
+
+	mgr.healthCheck(context.Background())
+
+	// Dialer failed all retries — pool remains under min.
+	assert.Equal(t, 0, p.Size(), "pool should remain empty when dialer fails")
+	assert.Equal(t, DefaultMaxReconnectRetries, d.count(), "dialer should have been called maxRetries times")
+}
+
+// TestHealthCheck_HealthyPoolResetsFailures — when pool is healthy, consecutive failures reset.
+func TestHealthCheck_HealthyPoolResetsFailures(t *testing.T) {
+	d := &mockDialer{rtt: 50 * time.Microsecond}
+	mgr, p, _ := makePoolMgr(t, 2, 8, d, 10*time.Second)
+
+	c1 := newMockConn(50 * time.Microsecond)
+	c2 := newMockConn(55 * time.Microsecond)
+	_ = p.Add(c1)
+	_ = p.Add(c2)
+
+	// Simulate previous failures.
+	mgr.consecutiveFailures = 5
+	mgr.lastPoolEmpty = true
+
+	mgr.healthCheck(context.Background())
+
+	// Pool is healthy (size >= min) — failures should reset.
+	assert.Equal(t, 0, mgr.consecutiveFailures, "consecutive failures should reset for healthy pool")
+	assert.False(t, mgr.lastPoolEmpty, "lastPoolEmpty should be cleared for healthy pool")
+}

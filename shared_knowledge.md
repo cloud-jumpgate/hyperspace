@@ -282,3 +282,21 @@ The Receiver's `processFrame` must write ALL header fields (version, flags, fram
 
 ### S-01: Image Map TTL Eviction
 Receiver image entries now carry a `lastAccess` timestamp. Every 1000 `DoWork` calls, stale entries (TTL default 60s) are evicted. `RemoveImage(sessionID)` provides immediate removal for `CmdRemoveSubscription`. The `nowFunc` field is injectable for deterministic testing.
+
+---
+
+## 2026-04-18 — CTO — Sprint S12: Fault Tolerance + CC Wiring Patterns
+
+### A-02: Pool Health Check with Reconnection
+`PoolManager.healthCheck` runs on a 500ms ticker inside `DoWork`. It detects closed connections (though `pool.Connections()` already prunes them via `pruneClosedLocked()`), then attempts reconnection with exponential backoff (base 100ms, max 10s, 5 retries). When the pool drains to zero, `ErrNoConnections` is logged once (deduplicated via `lastPoolEmpty` flag). `consecutiveFailures` resets when pool returns to healthy state (size >= min).
+
+**Observation:** `pool.Connections()` calls `pruneClosedLocked()` internally, so closed connections are already removed before the health check's explicit `IsClosed()` loop runs. The health check's primary value is the reconnection logic, not closed-connection detection.
+
+### F-03: CC Adapter Wiring
+`CCAdapter` in `pkg/cc/adapter.go` wraps a `CongestionControl` instance with a mutex for thread-safe access. Created per-connection via `NewAdapter(ccName, initialCwnd, minRTT)`. Falls back to CUBIC if the requested algorithm is unknown. A global registry (`RegisterAdapter`/`UnregisterAdapter`/`GetAdapter`) maps connection IDs to adapters.
+
+### S-03: Term-Aware Sender Position
+`sender.sendPosition` tracks `(partitionIndex, termOffset)` instead of a single int64. When `sendPublication` detects the active partition has changed (term rotation), it resets `termOffset` to 0 for the new partition. This prevents the sender from reading stale data at a high offset in the new partition.
+
+### C-02: Composite Session Key
+Receiver image map changed from `map[int32]*imageEntry` (keyed by sessionID alone) to `map[uint64]*imageEntry` using `compositeKey(sessionID, streamID) = uint64(uint32(sessionID))<<32 | uint64(uint32(streamID))`. This eliminates birthday collisions when multiple streams share the same sessionID. `RemoveImage` now takes both `(sessionID, streamID int32)` parameters.

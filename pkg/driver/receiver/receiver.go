@@ -25,11 +25,17 @@ const DefaultImageTTL = 60 * time.Second
 // evictionCheckInterval controls how many DoWork calls occur between eviction sweeps.
 const evictionCheckInterval = 1000
 
+// compositeKey creates a 64-bit key from (sessionID, streamID) to avoid birthday
+// collisions from rand.Int31() alone (~46K collision threshold). C-02 fix.
+func compositeKey(sessionID, streamID int32) uint64 {
+	return uint64(uint32(sessionID))<<32 | uint64(uint32(streamID))
+}
+
 // Receiver is the inbound data plane agent.
 type Receiver struct {
 	conductor    *conductor.Conductor
 	pools        map[string]*pool.Pool
-	images       map[int32]*imageEntry // sessionID -> image entry with TTL
+	images       map[uint64]*imageEntry // compositeKey(sessionID, streamID) -> image entry
 	mtu          int
 	termLen      int           // term length for image log buffers
 	imageTTL     time.Duration // TTL for idle image eviction
@@ -45,7 +51,7 @@ func New(cond *conductor.Conductor, mtu int) *Receiver {
 	return &Receiver{
 		conductor: cond,
 		pools:     make(map[string]*pool.Pool),
-		images:    make(map[int32]*imageEntry),
+		images:    make(map[uint64]*imageEntry),
 		mtu:       mtu,
 		termLen:   logbuffer.MinTermLength, // use minimum for image buffers in sprint 3
 		imageTTL:  DefaultImageTTL,
@@ -125,17 +131,29 @@ func (r *Receiver) EvictStaleImages() {
 // evictStaleImages is the internal eviction implementation.
 func (r *Receiver) evictStaleImages() {
 	now := r.nowFunc()
-	for sid, entry := range r.images {
+	for key, entry := range r.images {
 		if now.Sub(entry.lastAccess) > r.imageTTL {
-			delete(r.images, sid)
-			slog.Info("receiver: evicted stale image", "session_id", sid)
+			delete(r.images, key)
+			slog.Info("receiver: evicted stale image", "key", key)
 		}
 	}
 }
 
-// RemoveImage immediately removes the image for sessionID (called on CmdRemoveSubscription).
-func (r *Receiver) RemoveImage(sessionID int32) {
-	delete(r.images, sessionID)
+// RemoveImage immediately removes the image for the given sessionID+streamID composite key.
+func (r *Receiver) RemoveImage(sessionID, streamID int32) {
+	key := compositeKey(sessionID, streamID)
+	delete(r.images, key)
+}
+
+// RemoveImageBySessionID removes ALL images for a given sessionID (any streamID).
+// Used when a session is fully torn down.
+func (r *Receiver) RemoveImageBySessionID(sessionID int32) {
+	prefix := uint64(uint32(sessionID)) << 32
+	for key := range r.images {
+		if key>>32 == prefix>>32 {
+			delete(r.images, key)
+		}
+	}
 }
 
 // processFrame parses an incoming frame and writes it to the appropriate image log buffer.
@@ -183,8 +201,9 @@ func (r *Receiver) processFrame(data []byte) bool {
 		return false
 	}
 
-	// Look up or create an image log buffer for this session.
-	entry, err := r.getOrCreateImage(sessionID)
+	// Look up or create an image log buffer using composite key (C-02 fix).
+	key := compositeKey(sessionID, streamID)
+	entry, err := r.getOrCreateImage(key)
 	if err != nil {
 		slog.Error("receiver: failed to create image log buffer",
 			"session_id", sessionID,
@@ -249,9 +268,9 @@ func (r *Receiver) processFrame(data []byte) bool {
 	return true
 }
 
-// getOrCreateImage returns the image entry for sessionID, creating one if needed.
-func (r *Receiver) getOrCreateImage(sessionID int32) (*imageEntry, error) {
-	if entry, ok := r.images[sessionID]; ok {
+// getOrCreateImage returns the image entry for the given composite key, creating one if needed.
+func (r *Receiver) getOrCreateImage(key uint64) (*imageEntry, error) {
+	if entry, ok := r.images[key]; ok {
 		return entry, nil
 	}
 
@@ -265,8 +284,8 @@ func (r *Receiver) getOrCreateImage(sessionID int32) (*imageEntry, error) {
 		lb:         lb,
 		lastAccess: r.nowFunc(),
 	}
-	r.images[sessionID] = entry
-	slog.Info("receiver: created image log buffer", "session_id", sessionID)
+	r.images[key] = entry
+	slog.Info("receiver: created image log buffer", "key", key)
 	return entry, nil
 }
 
@@ -275,6 +294,6 @@ func (r *Receiver) Name() string { return "receiver" }
 
 // Close releases receiver resources.
 func (r *Receiver) Close() error {
-	r.images = make(map[int32]*imageEntry)
+	r.images = make(map[uint64]*imageEntry)
 	return nil
 }

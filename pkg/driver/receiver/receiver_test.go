@@ -637,11 +637,69 @@ func TestRemoveImage_ImmediateRemoval(t *testing.T) {
 		t.Fatalf("expected 1 image, got %d", rcv.ImageCount())
 	}
 
-	// Immediately remove.
-	rcv.RemoveImage(99)
+	// Immediately remove (sessionID=99, streamID=100 from buildFrame).
+	rcv.RemoveImage(99, 100)
 
 	if rcv.ImageCount() != 0 {
 		t.Fatalf("expected 0 images after RemoveImage, got %d", rcv.ImageCount())
+	}
+}
+
+// --- F-023: Composite Session Key tests ---
+
+func TestCompositeKey_SameSessionDifferentStream(t *testing.T) {
+	// Two publishers with same sessionID but different streamIDs should get separate images.
+	cond, _ := newTestConductor(t)
+	rcv := receiver.New(cond, 1200)
+
+	mc := newMockConn(1)
+	p := pool.New("peer1", 1, 4)
+	if err := p.Add(mc); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+	rcv.AddPool("peer1", p)
+
+	// Same sessionID (42), different streamIDs (100 vs 200).
+	frame1 := buildFrame(42, 100, 0, []byte("stream 100"))
+	frame2 := buildFrame(42, 200, 0, []byte("stream 200"))
+	mc.EnqueueFrame(frame1)
+	mc.EnqueueFrame(frame2)
+
+	n := rcv.DoWork(context.Background())
+	if n != 2 {
+		t.Fatalf("expected 2 frames, got %d", n)
+	}
+
+	// Should have 2 separate images (one per composite key).
+	if rcv.ImageCount() != 2 {
+		t.Fatalf("expected 2 images (composite key), got %d", rcv.ImageCount())
+	}
+}
+
+func TestCompositeKey_SameSessionSameStream_SharedImage(t *testing.T) {
+	// Same sessionID AND streamID should share one image.
+	cond, _ := newTestConductor(t)
+	rcv := receiver.New(cond, 1200)
+
+	mc := newMockConn(1)
+	p := pool.New("peer1", 1, 4)
+	if err := p.Add(mc); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+	rcv.AddPool("peer1", p)
+
+	frame1 := buildFrame(42, 100, 0, []byte("first"))
+	mc.EnqueueFrame(frame1)
+	rcv.DoWork(context.Background())
+
+	aligned := logbuffer.AlignedLength(logbuffer.HeaderLength + len([]byte("first")))
+	frame2 := buildFrame(42, 100, int32(aligned), []byte("second"))
+	mc.EnqueueFrame(frame2)
+	rcv.DoWork(context.Background())
+
+	// Should have 1 image (same composite key).
+	if rcv.ImageCount() != 1 {
+		t.Fatalf("expected 1 image (same composite key), got %d", rcv.ImageCount())
 	}
 }
 

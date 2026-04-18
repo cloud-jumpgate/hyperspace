@@ -1,6 +1,6 @@
 {
   "project": "hyperspace",
-  "last_updated": "2026-04-17T10:00:00Z",
+  "last_updated": "2026-04-18T17:00:00Z",
   "schema_version": "2.0",
   "_note": "Track at FEATURE level. Sprint-level-only tracking is a schema violation. Every feature must have its own entry with status, evaluator verdicts, and coverage.",
   "features": [
@@ -212,6 +212,50 @@
       "coverage_pct": 92,
       "pr_number": 9,
       "notes": "Fix: TTL-based eviction of stale image log buffers in receiver, triggered periodically."
+    },
+    {
+      "id": "F-020",
+      "name": "Pool Reconnection Logic (A-02)",
+      "sprint": "S12",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 96,
+      "pr_number": null,
+      "notes": "Fix: health-check loop with exponential backoff reconnection in PoolManager. 6 new tests."
+    },
+    {
+      "id": "F-021",
+      "name": "CC Algorithm Adapter (F-03)",
+      "sprint": "S12",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "Wire Hyperspace CC algorithms into quic-go connections via CCAdapter with mutex and global registry."
+    },
+    {
+      "id": "F-022",
+      "name": "Sender Position Term-Aware Tracking (S-03)",
+      "sprint": "S12",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "Fix: track (partitionIndex, termOffset) together; reset offset on partition change."
+    },
+    {
+      "id": "F-023",
+      "name": "Composite Session Key (C-02)",
+      "sprint": "S12",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 92,
+      "pr_number": null,
+      "notes": "Fix: use composite key (sessionID, streamID) as uint64 for image map instead of sessionID alone."
     }
   ],
   "_status_values": [
