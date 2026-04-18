@@ -20,6 +20,8 @@ import (
 // CCAdapter wraps a CongestionControl instance and provides thread-safe access
 // for use by the Sender's hot path. The adapter is created per-connection and
 // delegates all CC decisions to the underlying Hyperspace CC algorithm.
+//
+//nolint:revive // stutter is intentional: cc.CCAdapter is the established public API name
 type CCAdapter struct {
 	mu        sync.Mutex
 	cc        CongestionControl

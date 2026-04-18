@@ -314,7 +314,7 @@ func TestCreateInReadOnlyDir(t *testing.T) {
 	if err := os.Chmod(roDir, 0o555); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
-	defer os.Chmod(roDir, 0o755) // restore for cleanup
+	defer func() { _ = os.Chmod(roDir, 0o755) }() // restore for cleanup; error is non-actionable in defer
 
 	path := filepath.Join(roDir, "test.bin")
 	_, err := Create(path, 512)
@@ -508,7 +508,9 @@ func TestSharedMmap(t *testing.T) {
 
 	// Write via m1, read via m2
 	m1.Bytes()[100] = 0x55
-	m1.Sync()
+	if err := m1.Sync(); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
 
 	// After sync, m2 should see the write (MAP_SHARED)
 	if m2.Bytes()[100] != 0x55 {

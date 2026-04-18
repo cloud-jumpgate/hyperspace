@@ -70,8 +70,8 @@ func (m *mockConn) SentCount() int { return len(m.sentFrames) }
 
 // --- test helpers ---
 
-const testRingSize = (1 << 12) + 128   // 4096 + 128
-const testBroadcastSize = 8*520 + 128  // for conductor broadcast
+const testRingSize = (1 << 12) + 128  // 4096 + 128
+const testBroadcastSize = 8*520 + 128 // for conductor broadcast
 
 func newTestConductorAndRing(t *testing.T) (*conductor.Conductor, *ringbuffer.ManyToOneRingBuffer) {
 	t.Helper()

@@ -24,8 +24,8 @@ func startTestServer(t *testing.T) *quic.Listener {
 	ln, err := quic.Listen(udpConn, tlsConf, &quic.Config{
 		MaxIncomingStreams:    4096,
 		MaxIncomingUniStreams: 4096,
-		KeepAlivePeriod:      5 * time.Second,
-		Allow0RTT:            true,
+		KeepAlivePeriod:       5 * time.Second,
+		Allow0RTT:             true,
 	})
 	require.NoError(t, err, "start quic listener")
 

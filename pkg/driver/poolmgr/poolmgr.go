@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/cloud-jumpgate/hyperspace/pkg/driver/pathmgr"
@@ -25,8 +24,8 @@ type LearnerDecision int
 
 const (
 	LearnerDecisionHold   LearnerDecision = iota // keep current pool size
-	LearnerDecisionAdd                            // open one more connection
-	LearnerDecisionRemove                         // close one connection
+	LearnerDecisionAdd                           // open one more connection
+	LearnerDecisionRemove                        // close one connection
 )
 
 // String returns a human-readable decision name.
@@ -157,15 +156,13 @@ type PoolManager struct {
 	ccName   string
 	dialer   Dialer
 	ticker   *time.Ticker
-	mu       sync.Mutex
-	lastTick time.Time
 	// Health check and reconnection (A-02 fix)
-	healthTicker          *time.Ticker
-	maxReconnectRetries   int
-	reconnectBaseDelay    time.Duration
-	reconnectMaxDelay     time.Duration
-	consecutiveFailures   int
-	lastPoolEmpty         bool // tracks whether we already logged ErrNoConnections
+	healthTicker        *time.Ticker
+	maxReconnectRetries int
+	reconnectBaseDelay  time.Duration
+	reconnectMaxDelay   time.Duration
+	consecutiveFailures int
+	lastPoolEmpty       bool // tracks whether we already logged ErrNoConnections
 }
 
 // New creates a PoolManager.

@@ -113,8 +113,8 @@ func quicConfig() *quic.Config {
 	return &quic.Config{
 		MaxIncomingStreams:    4096,
 		MaxIncomingUniStreams: 4096,
-		KeepAlivePeriod:      5 * time.Second,
-		Allow0RTT:            true,
+		KeepAlivePeriod:       5 * time.Second,
+		Allow0RTT:             true,
 	}
 }
 

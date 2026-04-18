@@ -223,7 +223,9 @@ func TestMultipleReceivers(t *testing.T) {
 
 	messages := []string{"alpha", "beta", "gamma"}
 	for i, m := range messages {
-		tx.Transmit(int32(i+1), []byte(m))
+		if err := tx.Transmit(int32(i+1), []byte(m)); err != nil {
+			t.Fatalf("Transmit: %v", err)
+		}
 	}
 
 	readAll := func(rx *Receiver) []string {
@@ -271,8 +273,12 @@ func TestReceiverMissesEarlierMessages(t *testing.T) {
 	tx, _ := NewTransmitter(buf, testMaxPayload)
 
 	// Send messages before creating receiver
-	tx.Transmit(1, []byte("old"))
-	tx.Transmit(2, []byte("older"))
+	if err := tx.Transmit(1, []byte("old")); err != nil {
+		t.Fatalf("Transmit: %v", err)
+	}
+	if err := tx.Transmit(2, []byte("older")); err != nil {
+		t.Fatalf("Transmit: %v", err)
+	}
 
 	// Create receiver after messages already sent
 	rx, _ := NewReceiver(buf, testMaxPayload)
@@ -287,7 +293,9 @@ func TestReceiverMissesEarlierMessages(t *testing.T) {
 	}
 
 	// Now transmit a new message — receiver should see it
-	tx.Transmit(3, []byte("new"))
+	if err := tx.Transmit(3, []byte("new")); err != nil {
+		t.Fatalf("Transmit: %v", err)
+	}
 	ok, err = rx.Receive(func(_ int32, b *atomicbuf.AtomicBuffer, offset, length int) {
 		data := make([]byte, length)
 		b.GetBytes(offset, data)
@@ -313,7 +321,9 @@ func TestLappingDetection(t *testing.T) {
 
 	// Transmit more messages than the ring can hold, without consuming
 	for i := 0; i < 8; i++ {
-		tx.Transmit(int32(i+1), []byte("data"))
+		if err := tx.Transmit(int32(i+1), []byte("data")); err != nil {
+			t.Fatalf("Transmit[%d]: %v", i, err)
+		}
 	}
 
 	// Receiver should detect lapping

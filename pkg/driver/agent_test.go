@@ -157,10 +157,10 @@ func TestRunAgent_BothIdleAndResetCalledOnMixedWork(t *testing.T) {
 
 // panickingAgent panics on the first N calls to DoWork, then works normally.
 type panickingAgent struct {
-	name        string
-	panicCount  int // how many times to panic
-	callCount   atomic.Int64
-	workResult  int
+	name       string
+	panicCount int // how many times to panic
+	callCount  atomic.Int64
+	workResult int
 }
 
 func (p *panickingAgent) DoWork(_ context.Context) int {
@@ -171,7 +171,7 @@ func (p *panickingAgent) DoWork(_ context.Context) int {
 	return p.workResult
 }
 
-func (p *panickingAgent) Name() string  { return p.name }
+func (p *panickingAgent) Name() string { return p.name }
 func (p *panickingAgent) Close() error { return nil }
 
 func TestRunAgent_RecoversPanic(t *testing.T) {

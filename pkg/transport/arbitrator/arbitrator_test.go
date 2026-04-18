@@ -201,7 +201,7 @@ func TestSticky_SingleConnection(t *testing.T) {
 
 func TestSticky_PinsPublication(t *testing.T) {
 	a := arbitrator.NewSticky(0.5)
-	c1 := newMockConn(1, ms(5), 0, 100_000, 0)  // best
+	c1 := newMockConn(1, ms(5), 0, 100_000, 0) // best
 	c2 := newMockConn(2, ms(20), 0, 100_000, 0)
 
 	// First pick pins to c1.

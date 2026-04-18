@@ -268,8 +268,8 @@ func TestDispatchResponse_ShortPayload(t *testing.T) {
 // directly into the from-driver broadcast buffer to exercise the length-check
 // guard in dispatchResponse.
 func TestDispatchResponse_LowLevelShortPayload(t *testing.T) {
-	const ringSize = (1 << 12) + 128       // 4 KiB ring
-	const broadcastSize = 8*520 + 128      // 8-slot broadcast
+	const ringSize = (1 << 12) + 128  // 4 KiB ring
+	const broadcastSize = 8*520 + 128 // 8-slot broadcast
 
 	toDriverRaw := make([]byte, ringSize)
 	fromDriverRaw := make([]byte, broadcastSize)

@@ -28,6 +28,8 @@ func init() {
 }
 
 // CubicCC implements CUBIC congestion control.
+//
+//nolint:revive // stutter is intentional: cubic.CubicCC is the established public API name
 type CubicCC struct {
 	initialCwnd int
 	minRTT      time.Duration
@@ -36,9 +38,9 @@ type CubicCC struct {
 	ssthresh int // slow start threshold in bytes
 
 	// CUBIC state
-	wMax    float64   // window size just before the last reduction (bytes)
-	tEpoch  time.Time // start of the current congestion avoidance epoch
-	k       float64   // time to reach wMax (seconds)
+	wMax        float64   // window size just before the last reduction (bytes)
+	tEpoch      time.Time // start of the current congestion avoidance epoch
+	k           float64   // time to reach wMax (seconds)
 	inSlowStart bool
 
 	// RTT state (updated via OnRTTUpdate)

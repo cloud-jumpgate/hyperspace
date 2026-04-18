@@ -22,8 +22,8 @@ import (
 
 // counterMeta holds display metadata for each counter.
 type counterMeta struct {
-	id      int
-	label   string
+	id       int
+	label    string
 	showRate bool // false for absolute-only counters (e.g. connections_active)
 }
 

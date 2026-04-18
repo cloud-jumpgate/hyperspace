@@ -7,10 +7,10 @@
 // Buffer layout:
 //   - Ring region: [0, capacity)
 //   - Trailer (128 bytes): [capacity, capacity+128)
-//     - offset+0:  tail_position       (int64) — producer write cursor
-//     - offset+8:  head_cache_position (int64) — producer's cached head (avoids frequent atomic loads)
-//     - offset+64: head_position       (int64) — consumer read cursor
-//     - offset+72: correlation_id      (int64) — monotonic counter for correlation IDs
+//   - offset+0:  tail_position       (int64) — producer write cursor
+//   - offset+8:  head_cache_position (int64) — producer's cached head (avoids frequent atomic loads)
+//   - offset+64: head_position       (int64) — consumer read cursor
+//   - offset+72: correlation_id      (int64) — monotonic counter for correlation IDs
 //
 // The total buffer passed to New* must be exactly (power-of-2 capacity) + 128 bytes.
 //

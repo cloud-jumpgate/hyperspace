@@ -7,20 +7,20 @@ import (
 	"sync/atomic"
 	"time"
 
-	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/probes"
+	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 )
 
 // mockConn implements quictr.Connection for testing.
 type mockConn struct {
-	mu         sync.Mutex
-	id         uint64
-	closed     bool
-	lastPing   []byte // last PING received via SendProbe
-	pongQueue  [][]byte
-	stats      quictr.ConnectionStats
-	sendErr    error
-	recvErr    error
+	mu        sync.Mutex
+	id        uint64
+	closed    bool
+	lastPing  []byte // last PING received via SendProbe
+	pongQueue [][]byte
+	stats     quictr.ConnectionStats
+	sendErr   error
+	recvErr   error
 	// echoMode: if true, RecvProbe auto-echoes lastPing as PONG
 	echoMode bool
 }

@@ -13,6 +13,8 @@ import (
 
 // FileProvider loads TLS credentials from local PEM files.
 // All three paths (cert, key, CA) must be non-empty and readable.
+//
+//nolint:revive // stutter is intentional: file.FileProvider is the established public API name
 type FileProvider struct {
 	certPath string
 	keyPath  string

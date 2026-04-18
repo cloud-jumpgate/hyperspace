@@ -1,13 +1,13 @@
 {
   "project": "hyperspace",
-  "last_updated": "2026-04-17T00:00:00Z",
-  "state": "governance_aligned",
-  "current_sprint": "post-S10",
-  "sprints_complete": ["S1","S2","S3","S4","S5","S6","S7","S8","S9","S10"],
+  "last_updated": "2026-04-18",
+  "state": "ready",
+  "current_sprint": "S14-pending",
+  "sprints_complete": ["S1","S2","S3","S4","S5","S6","S7","S8","S9","S10","S11","S12","S13"],
   "last_session": {
-    "date": "2026-04-17",
-    "agent": "harness-engineering-team",
-    "action": "v2.0 framework alignment: CLAUDE.md updated to v2.0, progress.json converted to feature-level tracking, HARNESS_QUALITY_REPORT.md created, init.sh created, PR template created, sprint contract template updated, knowledge_base/INDEX.md populated"
+    "date": "2026-04-18",
+    "agent": "harness-evaluator",
+    "action": "Harness Evaluator audit of S11/S12/S13 — CONDITIONAL PASS issued. CI lint failures, coverage gaps, and telemetry events identified for remediation."
   },
   "test_suite": {
     "status": "passing",
@@ -15,21 +15,11 @@
     "last_run": "2026-04-18",
     "races": 0
   },
-  "binaries": {
-    "hsd": "built",
-    "hyperspace-stat": "built"
-  },
   "open_actions": [
-    "Code Evaluator must verify all 14 features (F-001 through F-014)",
-    "Security Evaluator must verify F-013 and F-014",
-    "Architecture Evaluator review overdue (required every 4 sprints)",
-    "Promote features from code_complete to evaluator_pass as verdicts arrive"
-  ],
-  "governance": {
-    "claude_md_version": "2.0",
-    "progress_json_schema": "2.0",
-    "harness_quality_report": "CONDITIONAL PASS",
-    "init_sh": "present",
-    "pr_template": "present"
-  }
+    "Fix CI golangci-lint failures (30+ errors)",
+    "Boost pkg/client coverage to ≥85%",
+    "Boost pkg/driver/receiver coverage to ≥90%",
+    "Security Evaluator not yet invoked for F-013/F-014",
+    "Architecture Evaluator not yet invoked"
+  ]
 }

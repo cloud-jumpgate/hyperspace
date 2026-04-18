@@ -37,7 +37,7 @@ var probeGains = [8]float64{1.25, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}
 type phase int
 
 const (
-	phaseStartup  phase = iota
+	phaseStartup phase = iota
 	phaseDrain
 	phaseProbeBW
 	phaseProbeRTT
@@ -55,6 +55,8 @@ type bwSample struct {
 }
 
 // BBRCC implements BBRv1 congestion control.
+//
+//nolint:revive // stutter is intentional: bbr.BBRCC is the established public API name
 type BBRCC struct {
 	initialCwnd int
 	initialRTT  time.Duration
@@ -67,8 +69,8 @@ type BBRCC struct {
 	bwRound   int
 
 	// RTprop estimation: windowed min over last rtpropWindowSec.
-	rtProp       time.Duration
-	rtPropStamp  time.Time // when rtProp was last updated
+	rtProp      time.Duration
+	rtPropStamp time.Time // when rtProp was last updated
 
 	// Pacing and cwnd gains.
 	pacingGain float64
@@ -79,9 +81,9 @@ type BBRCC struct {
 	pacingRate float64 // bytes/second
 
 	// Round tracking: used for STARTUP exit logic.
-	roundCount         int
-	startupRoundsSame  int
-	lastBtlBw          float64
+	roundCount        int
+	startupRoundsSame int
+	lastBtlBw         float64
 
 	// PROBE_BW cycle index.
 	probeBWRound int
@@ -99,7 +101,6 @@ type BBRCC struct {
 	delivered     int
 	deliveredTime time.Time
 	firstSentTime time.Time
-	lastAckedTime time.Time
 
 	// For bandwidth sampling: bytes in flight at send time.
 	lastRoundDelivered int

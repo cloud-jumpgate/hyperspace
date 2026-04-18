@@ -139,3 +139,40 @@ Before S2 begins, the following must be true:
 ### Bootstrap — 2026-04-17 — documentation-engineer
 
 Initial project bootstrap. All planning documents written from scratch. No implementation code. Hyperspace project in pre-implementation state with complete documentation foundation ready for S1 backend engineer session.
+
+---
+
+## Session: S11/S12/S13 Remediation — 2026-04-18
+
+**Agent:** Harness Evaluator → Backend Engineer
+**Status:** Complete
+
+### What was done this session
+- Harness Evaluator audited S11, S12, S13 — CONDITIONAL PASS
+- CI lint failures identified (30+ golangci-lint errors)
+- Coverage gaps: pkg/client 81.5%, pkg/driver/receiver 88.7%
+- Missing telemetry events for S12/S13 identified
+- Stale session artefacts identified
+
+### Remediation actions taken
+- Fixed all golangci-lint errors (gofmt, errcheck, revive stutter, unused fields/consts/funcs, ineffassign)
+- Boosted pkg/client coverage to 90.9% (≥85% target met)
+- Boosted pkg/driver/receiver coverage to 96.2% (≥90% target met)
+- Added missing telemetry events for S12 and S13
+- Updated session_state.json to reflect post-S13 state
+
+### Lint errors fixed (30+)
+- gofmt: counters.go, api.go, bbrv3.go, poolmgr.go
+- errcheck: 6 unchecked Transmit/Sync/Chmod calls in test files
+- revive stutter: 11 types across counters, cc/*, discovery/*, config/*, secrets/*, driver/*, internal/atomic
+- unused: lastAckedTime (bbr.go), probeBWLossThreshold → now used in PROBE_BW phase, nextCorrID (conductor.go), mu+lastTick (poolmgr.go), newDriverBuffers (coverage3_test.go)
+- ineffassign: ssthresh (cubic_test.go), payloadEnd (image.go) → refactored to clamp length directly, totalAligned (appender.go)
+
+### New files created
+- pkg/driver/receiver/coverage_test.go — tests for RemoveImageBySessionID, periodic eviction, negative termOffset
+- pkg/client/coverage4_test.go — tests for reconcileAfterLap (nil driver, no match, matching pub, matching sub), adaptive backoff, ring-full back pressure
+
+### Next actions
+- Verify CI passes on push
+- Invoke Security Evaluator for F-013 (AWS Integration) and F-014 (SPIFFE/SPIRE)
+- Invoke Architecture Evaluator (overdue — required every 4 sprints)

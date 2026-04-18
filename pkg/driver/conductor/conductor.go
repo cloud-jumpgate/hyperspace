@@ -73,19 +73,18 @@ type ImageState struct {
 
 // Conductor is the driver control plane agent.
 type Conductor struct {
-	toDriverRing     *ringbuffer.ManyToOneRingBuffer
-	fromDriverTx     *broadcast.Transmitter
-	publications     map[int64]*PublicationState
-	subscriptions    map[int64]*SubscriptionState
-	mu               sync.Mutex // only for external Admin() calls; DoWork is single-threaded
-	nextCorrID       int64
-	termLength       int
-	maxCmdsPerCycle  int                   // F-02 fix: configurable max commands per DoWork
-	clientAlive      map[int64]time.Time   // correlationID → last keepalive time
-	rng              *rand.Rand
+	toDriverRing    *ringbuffer.ManyToOneRingBuffer
+	fromDriverTx    *broadcast.Transmitter
+	publications    map[int64]*PublicationState
+	subscriptions   map[int64]*SubscriptionState
+	mu              sync.Mutex // only for external Admin() calls; DoWork is single-threaded
+	termLength      int
+	maxCmdsPerCycle int                 // F-02 fix: configurable max commands per DoWork
+	clientAlive     map[int64]time.Time // correlationID → last keepalive time
+	rng             *rand.Rand
 	// Lock-free publication/subscription snapshots (P-03 fix).
-	pubSnap  syncatomic.Pointer[[]*PublicationState]
-	subSnap  syncatomic.Pointer[[]*SubscriptionState]
+	pubSnap syncatomic.Pointer[[]*PublicationState]
+	subSnap syncatomic.Pointer[[]*SubscriptionState]
 }
 
 // New creates a Conductor.

@@ -415,7 +415,6 @@ func TestSlowStartOvershoots(t *testing.T) {
 
 	// Trigger a loss to set a known low ssthresh.
 	c.OnPacketLost(now, 0, mss, c.CongestionWindow())
-	ssthresh := c.CongestionWindow()
 
 	// Now ack a chunk larger than ssthresh — this will overshoot and get capped.
 	// cwnd is currently ssthresh; after loss cwnd==ssthresh so we're in CA, not SS.
@@ -424,7 +423,7 @@ func TestSlowStartOvershoots(t *testing.T) {
 	// After Reset, cwnd = cwndMin and ssthresh = cwndMax (back to initial).
 	// Cause loss again to get small ssthresh.
 	c.OnPacketLost(now, 1, mss, c.CongestionWindow())
-	ssthresh = c.CongestionWindow()
+	ssthresh := c.CongestionWindow()
 	if ssthresh <= 0 {
 		t.Fatalf("ssthresh should be > 0: %d", ssthresh)
 	}

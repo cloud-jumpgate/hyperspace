@@ -35,9 +35,9 @@ func (m *mockConn) RemoteAddr() net.Addr {
 	a, _ := net.ResolveTCPAddr("tcp", "127.0.0.1:9999")
 	return a
 }
-func (m *mockConn) Send(_ uint64, _ []byte) error             { return nil }
-func (m *mockConn) SendControl(_ []byte) error                { return nil }
-func (m *mockConn) SendProbe(_ []byte) error                  { return nil }
+func (m *mockConn) Send(_ uint64, _ []byte) error { return nil }
+func (m *mockConn) SendControl(_ []byte) error    { return nil }
+func (m *mockConn) SendProbe(_ []byte) error      { return nil }
 func (m *mockConn) RecvData(_ context.Context) (uint64, []byte, error) {
 	return 0, nil, nil
 }
@@ -52,5 +52,5 @@ func (m *mockConn) Stats() quictr.ConnectionStats {
 		BytesInFlight:    m.inflight,
 	}
 }
-func (m *mockConn) Close() error  { m.closed = true; return nil }
+func (m *mockConn) Close() error   { m.closed = true; return nil }
 func (m *mockConn) IsClosed() bool { return m.closed }

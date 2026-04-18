@@ -54,18 +54,18 @@ type response struct {
 // It is safe to call AddPublication, AddSubscription, and Close from
 // multiple goroutines concurrently.
 type Client struct {
-	drv         *driver.Driver // non-nil when embedded
-	ring        *ringbuffer.ManyToOneRingBuffer
-	rx          *broadcast.Receiver
-	nextCorrID  atomic.Int64
-	mu          sync.Mutex
-	pending     map[int64]*pendingRequest
+	drv           *driver.Driver // non-nil when embedded
+	ring          *ringbuffer.ManyToOneRingBuffer
+	rx            *broadcast.Receiver
+	nextCorrID    atomic.Int64
+	mu            sync.Mutex
+	pending       map[int64]*pendingRequest
 	publications  []*Publication
 	subscriptions []*Subscription
-	closed      atomic.Bool
-	stopPoll    context.CancelFunc
-	pollDone    chan struct{}
-	clientID    int64
+	closed        atomic.Bool
+	stopPoll      context.CancelFunc
+	pollDone      chan struct{}
+	clientID      int64
 }
 
 // NewEmbedded creates a Client backed by an embedded driver. All driver
@@ -353,9 +353,9 @@ func (c *Client) Close() error {
 
 // Adaptive backoff constants for pollBroadcast (A-05 fix).
 const (
-	pollMinSleep       = 100 * time.Microsecond // initial/active sleep
-	pollMaxSleep       = 1 * time.Millisecond   // maximum idle sleep
-	pollIdleThreshold  = 10                     // idle cycles before increasing sleep
+	pollMinSleep      = 100 * time.Microsecond // initial/active sleep
+	pollMaxSleep      = 1 * time.Millisecond   // maximum idle sleep
+	pollIdleThreshold = 10                     // idle cycles before increasing sleep
 )
 
 // pollBroadcast continuously reads from the broadcast receiver and dispatches

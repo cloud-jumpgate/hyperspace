@@ -14,19 +14,19 @@ import (
 
 // Counter IDs — each is an int64 at a fixed offset in the counters buffer.
 const (
-	CtrBytesSent         = 0
-	CtrBytesReceived     = 1
-	CtrMsgSent           = 2
-	CtrMsgReceived       = 3
-	CtrConnectionsActive = 4
-	CtrConnectionOpens   = 5
-	CtrConnectionCloses  = 6
-	CtrPingsSent         = 7
-	CtrPongsReceived     = 8
-	CtrLostFrames        = 9
+	CtrBytesSent          = 0
+	CtrBytesReceived      = 1
+	CtrMsgSent            = 2
+	CtrMsgReceived        = 3
+	CtrConnectionsActive  = 4
+	CtrConnectionOpens    = 5
+	CtrConnectionCloses   = 6
+	CtrPingsSent          = 7
+	CtrPongsReceived      = 8
+	CtrLostFrames         = 9
 	CtrBackPressureEvents = 10
-	CtrRotationEvents    = 11
-	NumCounters          = 12
+	CtrRotationEvents     = 11
+	NumCounters           = 12
 )
 
 // counterNames maps counter ID to its human-readable name.
@@ -77,6 +77,8 @@ func ptr64(buf []byte, id int) *int64 {
 
 // CountersReader reads counter values from a shared buffer (read-only).
 // Safe to use from multiple goroutines concurrently.
+//
+//nolint:revive // stutter is intentional: counters.CountersReader is the established public API name
 type CountersReader struct {
 	buf []byte
 }
@@ -97,6 +99,8 @@ func (r *CountersReader) Get(id int) int64 {
 
 // CountersWriter reads and writes counters (driver-side).
 // Safe to use from multiple goroutines concurrently.
+//
+//nolint:revive // stutter is intentional: counters.CountersWriter is the established public API name
 type CountersWriter struct {
 	buf []byte
 }

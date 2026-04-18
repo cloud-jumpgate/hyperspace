@@ -9,11 +9,11 @@ import (
 
 // Size constants for the log buffer.
 const (
-	DefaultTermLength  = 16 * 1024 * 1024  // 16 MiB
-	MinTermLength      = 64 * 1024         // 64 KiB
-	MaxTermLength      = 1024 * 1024 * 1024 // 1 GiB
-	LogMetaDataLength  = 4096
-	NumPartitions      = 3
+	DefaultTermLength = 16 * 1024 * 1024   // 16 MiB
+	MinTermLength     = 64 * 1024          // 64 KiB
+	MaxTermLength     = 1024 * 1024 * 1024 // 1 GiB
+	LogMetaDataLength = 4096
+	NumPartitions     = 3
 )
 
 // Log meta-data field offsets (relative to start of meta-data section).

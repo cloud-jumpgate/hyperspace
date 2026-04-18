@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/pool"
+	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,9 +27,9 @@ func (m *mockConn) RemoteAddr() net.Addr {
 	addr, _ := net.ResolveTCPAddr("tcp", "127.0.0.1:9999")
 	return addr
 }
-func (m *mockConn) Send(_ uint64, _ []byte) error             { return nil }
-func (m *mockConn) SendControl(_ []byte) error                { return nil }
-func (m *mockConn) SendProbe(_ []byte) error                  { return nil }
+func (m *mockConn) Send(_ uint64, _ []byte) error { return nil }
+func (m *mockConn) SendControl(_ []byte) error    { return nil }
+func (m *mockConn) SendProbe(_ []byte) error      { return nil }
 func (m *mockConn) RecvData(_ context.Context) (uint64, []byte, error) {
 	return 0, nil, nil
 }

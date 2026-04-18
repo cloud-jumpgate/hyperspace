@@ -138,12 +138,10 @@ func (a *TermAppender) AppendFragmented(
 	remaining := len(src)
 	termLen := a.termLength()
 
-	// Pre-calculate total bytes needed.
+	// Pre-calculate total bytes needed, accounting for the shorter last fragment.
 	numFragments := (remaining + maxPayloadLength - 1) / maxPayloadLength
-	totalAligned := numFragments * AlignedLength(HeaderLength+maxPayloadLength)
-	// Last fragment may be shorter.
 	lastPayload := remaining - (numFragments-1)*maxPayloadLength
-	totalAligned = (numFragments-1)*AlignedLength(HeaderLength+maxPayloadLength) +
+	totalAligned := (numFragments-1)*AlignedLength(HeaderLength+maxPayloadLength) +
 		AlignedLength(HeaderLength+lastPayload)
 
 	rawTail := a.claim(totalAligned)

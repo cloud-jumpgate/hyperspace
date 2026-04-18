@@ -25,6 +25,8 @@ type ssmGetClient interface {
 
 // SSMLoader reads configuration from AWS SSM Parameter Store.
 // Path pattern: /hyperspace/{env}/{role}/{param}
+//
+//nolint:revive // stutter is intentional: ssm.SSMLoader is the established public API name
 type SSMLoader struct {
 	client ssmGetClient
 	env    string

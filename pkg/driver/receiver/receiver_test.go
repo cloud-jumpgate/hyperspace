@@ -52,9 +52,9 @@ func (m *mockConn) RemoteAddr() net.Addr {
 	a, _ := net.ResolveTCPAddr("tcp", "127.0.0.1:9999")
 	return a
 }
-func (m *mockConn) Send(_ uint64, _ []byte) error   { return nil }
-func (m *mockConn) SendControl(_ []byte) error      { return nil }
-func (m *mockConn) SendProbe(_ []byte) error        { return nil }
+func (m *mockConn) Send(_ uint64, _ []byte) error                 { return nil }
+func (m *mockConn) SendControl(_ []byte) error                    { return nil }
+func (m *mockConn) SendProbe(_ []byte) error                      { return nil }
 func (m *mockConn) RecvControl(_ context.Context) ([]byte, error) { return nil, nil }
 func (m *mockConn) RecvProbe(_ context.Context) ([]byte, error)   { return nil, nil }
 func (m *mockConn) RTT() time.Duration                            { return time.Millisecond }
@@ -97,13 +97,13 @@ func buildFrame(sessionID, streamID, termOffset int32, payload []byte) []byte {
 	frameLen := logbuffer.HeaderLength + len(payload)
 	frame := make([]byte, frameLen)
 
-	binary.LittleEndian.PutUint32(frame[0:], uint32(frameLen)) // frameLength
-	frame[4] = 1                                               // version
-	frame[5] = logbuffer.FlagBegin | logbuffer.FlagEnd         // unfragmented
+	binary.LittleEndian.PutUint32(frame[0:], uint32(frameLen))                // frameLength
+	frame[4] = 1                                                              // version
+	frame[5] = logbuffer.FlagBegin | logbuffer.FlagEnd                        // unfragmented
 	binary.LittleEndian.PutUint16(frame[6:], uint16(logbuffer.FrameTypeDATA)) // frameType
-	binary.LittleEndian.PutUint32(frame[8:], uint32(termOffset))  // termOffset
-	binary.LittleEndian.PutUint32(frame[12:], uint32(sessionID))  // sessionID
-	binary.LittleEndian.PutUint32(frame[16:], uint32(streamID))   // streamID
+	binary.LittleEndian.PutUint32(frame[8:], uint32(termOffset))              // termOffset
+	binary.LittleEndian.PutUint32(frame[12:], uint32(sessionID))              // sessionID
+	binary.LittleEndian.PutUint32(frame[16:], uint32(streamID))               // streamID
 	// termID, reservedValue = 0
 	if len(payload) > 0 {
 		copy(frame[logbuffer.HeaderLength:], payload)

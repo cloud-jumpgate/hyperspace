@@ -42,8 +42,14 @@ func (c *Client) NewRingWriter() (*ringbuffer.ManyToOneRingBuffer, error) {
 // PendingRequest returns a channel that will receive the response for the
 // given correlation ID. This is used to register a fake pending request
 // before injecting a fake response.
-func (c *Client) RegisterFakePending(corrID int64) <-chan struct{ MsgTypeID int32; Payload []byte } {
-	ch := make(chan struct{ MsgTypeID int32; Payload []byte }, 1)
+func (c *Client) RegisterFakePending(corrID int64) <-chan struct {
+	MsgTypeID int32
+	Payload   []byte
+} {
+	ch := make(chan struct {
+		MsgTypeID int32
+		Payload   []byte
+	}, 1)
 	c.mu.Lock()
 	c.pending[corrID] = &pendingRequest{ch: make(chan response, 1)}
 	c.mu.Unlock()

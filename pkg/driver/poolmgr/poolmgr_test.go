@@ -44,12 +44,12 @@ func (m *mockConn) ID() uint64 { return m.id }
 func (m *mockConn) RemoteAddr() net.Addr {
 	return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4433}
 }
-func (m *mockConn) Send(_ uint64, _ []byte) error                    { return nil }
-func (m *mockConn) SendControl(_ []byte) error                       { return nil }
-func (m *mockConn) SendProbe(_ []byte) error                         { return nil }
+func (m *mockConn) Send(_ uint64, _ []byte) error                      { return nil }
+func (m *mockConn) SendControl(_ []byte) error                         { return nil }
+func (m *mockConn) SendProbe(_ []byte) error                           { return nil }
 func (m *mockConn) RecvData(_ context.Context) (uint64, []byte, error) { return 0, nil, nil }
-func (m *mockConn) RecvControl(_ context.Context) ([]byte, error)    { return nil, nil }
-func (m *mockConn) RecvProbe(_ context.Context) ([]byte, error)      { return nil, nil }
+func (m *mockConn) RecvControl(_ context.Context) ([]byte, error)      { return nil, nil }
+func (m *mockConn) RecvProbe(_ context.Context) ([]byte, error)        { return nil, nil }
 func (m *mockConn) RTT() time.Duration {
 	m.mu.Lock()
 	defer m.mu.Unlock()

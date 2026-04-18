@@ -23,14 +23,6 @@ import (
 // from-driver broadcast buffer. This allows us to test handlePublicationReady
 // and handleSubscriptionReady error branches.
 
-// newDriverBuffers creates the raw byte slices that match the driver's
-// default buffer layout. Returns (toDriverBuf, fromDriverBuf).
-func newDriverBuffers(cfg *driver.Config) ([]byte, []byte) {
-	to := make([]byte, cfg.ToDriverBufSize)
-	from := make([]byte, cfg.FromDriverBufSize)
-	return to, from
-}
-
 // ---- handleSubscriptionReady error branch ----
 
 // TestAddSubscription_HandleSubscriptionReady_ErrorBranch injects an RspError

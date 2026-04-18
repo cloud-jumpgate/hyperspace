@@ -11,8 +11,8 @@
 // Buffer layout:
 //   - Ring region: [0, capacity)    — fixed-size record slots
 //   - Trailer (128 bytes): [capacity, capacity+128)
-//     - offset+0:  latest_counter (int64) — sequence number of last transmitted message
-//     - offset+8:  descriptor     (int64) — unused / reserved
+//   - offset+0:  latest_counter (int64) — sequence number of last transmitted message
+//   - offset+8:  descriptor     (int64) — unused / reserved
 //
 // Each record slot in the ring:
 //   - offset 0: length   (int32 LE) — payload length (0 = empty/padding)

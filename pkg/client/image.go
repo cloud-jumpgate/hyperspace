@@ -31,13 +31,13 @@ type FragmentHandler func(buf []byte, offset, length int, header FragmentHeader)
 // Poll is safe to call from a single goroutine; it is not concurrency-safe
 // for multiple simultaneous callers on the same Image.
 type Image struct {
-	sessionID    int32
-	streamID     int32
-	logBuf       *logbuffer.LogBuffer
-	termOffset   int32 // current read position within the active term
-	partIdx      int   // which of the three partitions we are reading
-	position     atomic.Int64
-	closed       atomic.Bool
+	sessionID  int32
+	streamID   int32
+	logBuf     *logbuffer.LogBuffer
+	termOffset int32 // current read position within the active term
+	partIdx    int   // which of the three partitions we are reading
+	position   atomic.Int64
+	closed     atomic.Bool
 }
 
 // newImage constructs an Image for a given log buffer.
@@ -69,11 +69,11 @@ func (img *Image) Poll(handler FragmentHandler, fragmentLimit int) int {
 				FrameType:  hdr.FrameType(),
 			}
 			// Deliver the payload slice from the term buffer bytes.
+			// Clamp length to the actual buffer capacity to prevent OOB reads.
 			raw := buf.Bytes()
 			payloadStart := offset + logbuffer.HeaderLength
-			payloadEnd := payloadStart + length
-			if payloadEnd > len(raw) {
-				payloadEnd = len(raw)
+			if payloadStart+length > len(raw) {
+				length = len(raw) - payloadStart
 			}
 			handler(raw, payloadStart, length, fh)
 		},

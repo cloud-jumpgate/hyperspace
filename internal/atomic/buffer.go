@@ -16,6 +16,8 @@ import (
 // AtomicBuffer wraps a byte slice and exposes atomic and volatile operations.
 // All multi-byte values are little-endian (same as Aeron wire format).
 // The buffer may back a memory-mapped file or a plain heap allocation.
+//
+//nolint:revive // stutter is intentional: atomic.AtomicBuffer is the established public API name
 type AtomicBuffer struct {
 	buf []byte
 }

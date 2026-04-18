@@ -28,6 +28,8 @@ type smGetClient interface {
 }
 
 // SecretsManagerProvider loads TLS credentials from AWS Secrets Manager.
+//
+//nolint:revive // stutter is intentional: secretsmanager.SecretsManagerProvider is the established public API name
 type SecretsManagerProvider struct {
 	client   smGetClient
 	secretID string

@@ -43,13 +43,13 @@ func TestSSMLoader_AllParametersPresent(t *testing.T) {
 
 	mock := &mockSSMClient{
 		values: map[string]string{
-			"/hyperspace/prod/sender/pool_size":        "16",
+			"/hyperspace/prod/sender/pool_size":         "16",
 			"/hyperspace/prod/sender/probe_interval_ms": "100",
-			"/hyperspace/prod/sender/cc_algorithm":     "cubic",
-			"/hyperspace/prod/sender/log_level":        "debug",
-			"/hyperspace/prod/sender/tls_cert":         "/certs/cert.pem",
-			"/hyperspace/prod/sender/tls_key":          "/certs/key.pem",
-			"/hyperspace/prod/sender/tls_ca":           "/certs/ca.pem",
+			"/hyperspace/prod/sender/cc_algorithm":      "cubic",
+			"/hyperspace/prod/sender/log_level":         "debug",
+			"/hyperspace/prod/sender/tls_cert":          "/certs/cert.pem",
+			"/hyperspace/prod/sender/tls_key":           "/certs/key.pem",
+			"/hyperspace/prod/sender/tls_ca":            "/certs/ca.pem",
 		},
 	}
 

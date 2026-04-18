@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	mss    = 1200
+	mss     = 1200
 	cwndMin = 2 * mss
 	cwndMax = 64 * 1024 * 1024
 
@@ -43,7 +43,7 @@ type Policy interface {
 type NullPolicy struct{}
 
 func (NullPolicy) Infer(_ []float32) (float32, error) { return 0, nil }
-func (NullPolicy) Close() error                        { return nil }
+func (NullPolicy) Close() error                       { return nil }
 
 // globalPolicy is the shared policy instance for the "drl" registered controller.
 // Operators may call SetPolicy to swap it at runtime.
@@ -69,6 +69,8 @@ func init() {
 }
 
 // DRLController implements cc.CongestionControl backed by a Policy.
+//
+//nolint:revive // stutter is intentional: drl.DRLController is the established public API name
 type DRLController struct {
 	initialCwnd int
 	minRTT      time.Duration

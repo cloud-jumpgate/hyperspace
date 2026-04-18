@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	alphaEWMA = 0.125 // EWMA smoothing factor for sRTT
-	betaRTTVar = 0.25 // EWMA smoothing factor for rttVar
+	alphaEWMA  = 0.125 // EWMA smoothing factor for sRTT
+	betaRTTVar = 0.25  // EWMA smoothing factor for rttVar
 )
 
 // ConnectionSample holds per-connection path statistics. Immutable once published.
@@ -58,7 +58,7 @@ type PathManager struct {
 	snapshots     map[string]*atomic.Pointer[PoolSnapshot] // peer → snapshot ptr
 	connStates    map[uint64]*connState                    // connID → ewma state
 	probeInterval time.Duration
-	seq           uint64            // monotonic ping sequence counter (protected by mu)
+	seq           uint64                  // monotonic ping sequence counter (protected by mu)
 	pending       map[uint64]pendingProbe // seq → pending probe info
 }
 

@@ -19,8 +19,8 @@ type CongestionControl interface {
 	OnRTTUpdate(rttSample, sRTT, rttVar time.Duration)
 
 	// State queries — called by sender path (must be fast, no alloc).
-	CongestionWindow() int  // bytes
-	PacingRate() int        // bytes per second; 0 = unlimited
+	CongestionWindow() int // bytes
+	PacingRate() int       // bytes per second; 0 = unlimited
 	CanSend(inFlight int) bool
 
 	// Lifecycle.

@@ -90,7 +90,12 @@ func (evt *Event) GetMessage() string {
 func encode(dst []byte, evt Event) {
 	binary.LittleEndian.PutUint16(dst[0:2], uint16(evt.Type))
 	// bytes 2-7: padding — zero
-	dst[2] = 0; dst[3] = 0; dst[4] = 0; dst[5] = 0; dst[6] = 0; dst[7] = 0
+	dst[2] = 0
+	dst[3] = 0
+	dst[4] = 0
+	dst[5] = 0
+	dst[6] = 0
+	dst[7] = 0
 	binary.LittleEndian.PutUint64(dst[8:16], uint64(evt.TimestampNs))
 	binary.LittleEndian.PutUint64(dst[16:24], evt.ConnID)
 	binary.LittleEndian.PutUint32(dst[24:28], uint32(evt.StreamID))

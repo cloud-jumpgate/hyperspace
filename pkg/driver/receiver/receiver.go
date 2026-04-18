@@ -33,14 +33,14 @@ func compositeKey(sessionID, streamID int32) uint64 {
 
 // Receiver is the inbound data plane agent.
 type Receiver struct {
-	conductor    *conductor.Conductor
-	pools        map[string]*pool.Pool
-	images       map[uint64]*imageEntry // compositeKey(sessionID, streamID) -> image entry
-	mtu          int
-	termLen      int           // term length for image log buffers
-	imageTTL     time.Duration // TTL for idle image eviction
-	doWorkCount  int           // counter for periodic eviction
-	nowFunc      func() time.Time // injectable clock for testing
+	conductor   *conductor.Conductor
+	pools       map[string]*pool.Pool
+	images      map[uint64]*imageEntry // compositeKey(sessionID, streamID) -> image entry
+	mtu         int
+	termLen     int              // term length for image log buffers
+	imageTTL    time.Duration    // TTL for idle image eviction
+	doWorkCount int              // counter for periodic eviction
+	nowFunc     func() time.Time // injectable clock for testing
 }
 
 // New creates a Receiver.

@@ -8,7 +8,6 @@ import (
 	"github.com/cloud-jumpgate/hyperspace/pkg/cc/bbr"
 )
 
-
 const mss = 1200
 
 func newBBR(initialCwnd int) cc.CongestionControl {
@@ -23,7 +22,7 @@ func driveRounds(t *testing.T, b cc.CongestionControl, initialCwnd int, n int, n
 		// Simulate sending then acking a full window.
 		bytesPerRound := initialCwnd
 		sent := 0
-		pn := cc.PacketNumber(round*1000)
+		pn := cc.PacketNumber(round * 1000)
 		for sent < bytesPerRound {
 			chunk := mss
 			if sent+chunk > bytesPerRound {

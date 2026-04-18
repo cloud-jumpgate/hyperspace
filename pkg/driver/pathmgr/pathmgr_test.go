@@ -7,9 +7,9 @@ import (
 
 	"go.uber.org/goleak"
 
-	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/pool"
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/probes"
+	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

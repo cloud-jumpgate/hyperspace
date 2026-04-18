@@ -191,8 +191,8 @@ func TestHandlePublicationReady_NilPublicationState(t *testing.T) {
 	corrID := int64(99999) // not in conductor's publications map
 	payload := make([]byte, 16)
 	binary.LittleEndian.PutUint64(payload[0:], uint64(corrID))
-	binary.LittleEndian.PutUint32(payload[8:], uint32(42))  // sessionID
-	binary.LittleEndian.PutUint32(payload[12:], uint32(1))  // streamID
+	binary.LittleEndian.PutUint32(payload[8:], uint32(42)) // sessionID
+	binary.LittleEndian.PutUint32(payload[12:], uint32(1)) // streamID
 
 	rsp := response{
 		msgTypeID: conductor.RspPublicationReady,

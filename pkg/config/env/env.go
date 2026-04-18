@@ -24,6 +24,8 @@ import (
 )
 
 // EnvLoader reads configuration from environment variables.
+//
+//nolint:revive // stutter is intentional: env.EnvLoader is the established public API name
 type EnvLoader struct{}
 
 // New creates a new EnvLoader.

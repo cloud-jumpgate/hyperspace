@@ -4,4 +4,3 @@ package identity
 func NewWithClient(client workloadClient) *SPIFFESource {
 	return newWithClient(client)
 }
-

@@ -20,6 +20,8 @@ type discoverClient interface {
 }
 
 // CloudMapProvider resolves endpoints from AWS Cloud Map.
+//
+//nolint:revive // stutter is intentional: cloudmap.CloudMapProvider is the established public API name
 type CloudMapProvider struct {
 	client    discoverClient
 	namespace string

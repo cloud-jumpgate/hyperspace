@@ -17,3 +17,5 @@
 {"event":"sprint_complete","sprint":"S11","name":"Hot Path Correctness","timestamp":"2026-04-17T12:00:00Z","features":["F-015","F-016","F-017","F-018","F-019"],"verdict":"PASS","pr_number":9,"agent":"CTO"}
 {"event":"sprint_start","sprint":"S12","name":"Fault Tolerance + CC Wiring","timestamp":"2026-04-17T13:00:00Z","features":["F-020","F-021","F-022","F-023"],"agent":"CTO"}
 {"event":"sprint_start","sprint":"S13","timestamp":"2026-04-18T17:05:00Z","agent":"cto","features":["F-024","F-025","F-026","F-027","F-028","F-029"]}
+{"timestamp":"2026-04-18T12:00:00Z","project":"hyperspace","event":"sprint_complete","sprint":"S12","agent":"backend-engineer","detail":"Fault tolerance and CC wiring: A-02 reconnection, F-03 CC adapter, S-03 position tracking, C-02 composite session key. 4 features at evaluator_pass."}
+{"timestamp":"2026-04-18T13:00:00Z","project":"hyperspace","event":"sprint_complete","sprint":"S13","agent":"backend-engineer","detail":"Operability and scale: F-01 transport interface, F-02 config externalisation, A-04 broadcast reconciliation, P-03 lock-free conductor, C-08 sticky cleanup, A-05 adaptive backoff. 6 features at evaluator_pass."}

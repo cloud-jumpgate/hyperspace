@@ -71,10 +71,10 @@ func TestHeader_FlagHelpers(t *testing.T) {
 	buf := atomic.NewAtomicBuffer(raw)
 
 	tests := []struct {
-		name           string
-		flags          uint8
-		wantBegin      bool
-		wantEnd        bool
+		name             string
+		flags            uint8
+		wantBegin        bool
+		wantEnd          bool
 		wantUnfragmented bool
 	}{
 		{"unfragmented", FlagUnfragmented, true, true, true},

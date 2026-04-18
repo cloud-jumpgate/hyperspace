@@ -40,7 +40,7 @@ var probeGains = [8]float64{1.25, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}
 type phase int
 
 const (
-	phaseStartup  phase = iota
+	phaseStartup phase = iota
 	phaseDrain
 	phaseProbeBW
 	phaseProbeRTT
@@ -58,6 +58,8 @@ type bwSample struct {
 }
 
 // BBRv3CC implements BBRv3 congestion control.
+//
+//nolint:revive // stutter is intentional: bbrv3.BBRv3CC is the established public API name
 type BBRv3CC struct {
 	initialCwnd int
 	initialRTT  time.Duration
@@ -76,9 +78,9 @@ type BBRv3CC struct {
 	cwnd       int
 	pacingRate float64
 
-	roundCount         int
-	startupRoundsSame  int
-	lastBtlBw          float64
+	roundCount        int
+	startupRoundsSame int
+	lastBtlBw         float64
 
 	probeBWRound int
 
@@ -97,7 +99,7 @@ type BBRv3CC struct {
 	startTime time.Time
 
 	// Loss tracking per round (BBRv3).
-	lostThisRound int
+	lostThisRound  int
 	ackedThisRound int
 }
 
@@ -198,8 +200,18 @@ func (b *BBRv3CC) onNewRound(t time.Time, inFlight int) {
 			b.enterProbeBW(t)
 		}
 	case phaseProbeBW:
-		// BBRv3: do NOT re-enter STARTUP on loss < 2%.
-		// Loss is handled in OnPacketLost; we just cycle phases here.
+		// BBRv3: do NOT re-enter STARTUP on loss < probeBWLossThreshold (2%).
+		// Only apply a mild cwnd reduction when loss exceeds the threshold.
+		if b.ackedThisRound > 0 && b.lostThisRound > 0 {
+			lossRate := float64(b.lostThisRound) / float64(b.lostThisRound+b.ackedThisRound)
+			if lossRate > probeBWLossThreshold {
+				// Mild multiplicative decrease — do not re-enter STARTUP.
+				b.cwnd = int(float64(b.cwnd) * (1 - lossRate*0.5))
+				if b.cwnd < cwndMin {
+					b.cwnd = cwndMin
+				}
+			}
+		}
 		b.probeBWRound = (b.probeBWRound + 1) % 8
 		b.pacingGain = probeGains[b.probeBWRound]
 		b.cwndGain = 2.0

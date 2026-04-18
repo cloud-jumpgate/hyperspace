@@ -67,6 +67,8 @@ func New(cond *conductor.Conductor, arb arbitrator.Arbitrator, mtu int, opts ...
 }
 
 // SenderOption configures a Sender.
+//
+//nolint:revive // stutter is intentional: sender.SenderOption is the established public API name
 type SenderOption func(*Sender)
 
 // WithFragmentsPerBatch sets the maximum frames read from a log buffer per DoWork call.

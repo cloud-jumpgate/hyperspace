@@ -10,6 +10,8 @@ import (
 
 // StaticProvider resolves endpoints from a fixed map of name → []"host:port".
 // It is safe for concurrent use.
+//
+//nolint:revive // stutter is intentional: static.StaticProvider is the established public API name
 type StaticProvider struct {
 	peers map[string][]string
 }
