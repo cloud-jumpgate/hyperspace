@@ -1,0 +1,23 @@
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - revive
+  disable:
+    - depguard
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+
+issues:
+  exclude-rules:
+    # Test files are allowed to use unexported identifiers
+    - path: _test\.go
+      linters: [revive]
