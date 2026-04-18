@@ -381,6 +381,101 @@ func TestDoWork_NilLogBufPublication_ReturnsZero(t *testing.T) {
 	}
 }
 
+// --- F-022: Sender Position Term-Aware Tracking ---
+
+func TestDoWork_PositionTracksPartitionChange(t *testing.T) {
+	// After term rotation, sender should read from offset 0 in the new partition.
+	cond, ring := newTestConductorAndRing(t)
+
+	mc := newMockConn(1)
+	p := pool.New("peer1", 1, 4)
+	if err := p.Add(mc); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+
+	s := sender.New(cond, arbitrator.NewRandom(nil), 1200)
+	s.AddPool("peer1", p)
+
+	writeAddPublication(t, ring, 1, 100)
+	cond.DoWork(context.Background())
+	pubs := cond.Publications()
+	if len(pubs) != 1 {
+		t.Fatalf("expected 1 publication")
+	}
+
+	// Write messages to fill the first partition and trigger rotation.
+	bigMsg := make([]byte, 1024)
+	for {
+		app := pubs[0].LogBuf.Appender(0)
+		result := app.AppendUnfragmented(pubs[0].SessionID, pubs[0].StreamID, pubs[0].TermID, bigMsg, 0)
+		if result < 0 {
+			break
+		}
+	}
+
+	// Send all frames from partition 0.
+	for {
+		n := s.DoWork(context.Background())
+		if n == 0 {
+			break
+		}
+	}
+
+	// Now write to partition 1 after rotation.
+	pubs[0].LogBuf.SetActivePartitionIndex(1)
+	app1 := pubs[0].LogBuf.Appender(1)
+	smallMsg := []byte("post-rotation")
+	result := app1.AppendUnfragmented(pubs[0].SessionID, pubs[0].StreamID, pubs[0].TermID, smallMsg, 0)
+	if result < 0 {
+		t.Fatalf("AppendUnfragmented on partition 1 failed: %d", result)
+	}
+
+	// Sender should pick up the new frame from partition 1 at offset 0.
+	n := s.DoWork(context.Background())
+	if n != 1 {
+		t.Fatalf("expected 1 frame from new partition, got %d", n)
+	}
+}
+
+func TestDoWork_NoFrameSkipOnRotation(t *testing.T) {
+	// Verify that all frames are sent, even across partition boundaries.
+	cond, ring := newTestConductorAndRing(t)
+
+	mc := newMockConn(1)
+	p := pool.New("peer1", 1, 4)
+	if err := p.Add(mc); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+
+	s := sender.New(cond, arbitrator.NewRandom(nil), 1200)
+	s.AddPool("peer1", p)
+
+	writeAddPublication(t, ring, 1, 100)
+	cond.DoWork(context.Background())
+	pubs := cond.Publications()
+
+	// Write 3 messages to partition 0.
+	appendToPublication(t, pubs[0], []byte("msg-1"))
+	appendToPublication(t, pubs[0], []byte("msg-2"))
+	appendToPublication(t, pubs[0], []byte("msg-3"))
+
+	totalSent := 0
+	for {
+		n := s.DoWork(context.Background())
+		totalSent += n
+		if n == 0 {
+			break
+		}
+	}
+
+	if totalSent != 3 {
+		t.Fatalf("expected 3 frames sent total, got %d", totalSent)
+	}
+	if mc.SentCount() != 3 {
+		t.Fatalf("expected 3 frames on connection, got %d", mc.SentCount())
+	}
+}
+
 func TestDoWork_UsesArbitrator(t *testing.T) {
 	cond, ring := newTestConductorAndRing(t)
 

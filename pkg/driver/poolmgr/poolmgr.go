@@ -6,7 +6,9 @@ package poolmgr
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -14,6 +16,9 @@ import (
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/pool"
 	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 )
+
+// ErrNoConnections is returned/logged when the pool has drained to zero connections.
+var ErrNoConnections = errors.New("poolmgr: pool has zero connections")
 
 // LearnerDecision is the output of the Adaptive Pool Learner.
 type LearnerDecision int
@@ -134,6 +139,14 @@ func defaultDialer(ctx context.Context, addr string, tlsConf *tls.Config, ccName
 	return quictr.Dial(ctx, addr, tlsConf, ccName)
 }
 
+// Default health check and reconnection parameters.
+const (
+	DefaultHealthCheckInterval = 500 * time.Millisecond
+	DefaultMaxReconnectRetries = 5
+	DefaultReconnectBaseDelay  = 100 * time.Millisecond
+	DefaultReconnectMaxDelay   = 10 * time.Second
+)
+
 // PoolManager manages connection lifecycle for one pool.
 type PoolManager struct {
 	pool     *pool.Pool
@@ -146,6 +159,13 @@ type PoolManager struct {
 	ticker   *time.Ticker
 	mu       sync.Mutex
 	lastTick time.Time
+	// Health check and reconnection (A-02 fix)
+	healthTicker          *time.Ticker
+	maxReconnectRetries   int
+	reconnectBaseDelay    time.Duration
+	reconnectMaxDelay     time.Duration
+	consecutiveFailures   int
+	lastPoolEmpty         bool // tracks whether we already logged ErrNoConnections
 }
 
 // New creates a PoolManager.
@@ -170,14 +190,18 @@ func New(
 		dialer = defaultDialer
 	}
 	return &PoolManager{
-		pool:     p,
-		pathMgr:  pm,
-		learner:  learner,
-		tlsConf:  tlsConf,
-		peerAddr: peerAddr,
-		ccName:   ccName,
-		dialer:   dialer,
-		ticker:   time.NewTicker(learnerInterval),
+		pool:                p,
+		pathMgr:             pm,
+		learner:             learner,
+		tlsConf:             tlsConf,
+		peerAddr:            peerAddr,
+		ccName:              ccName,
+		dialer:              dialer,
+		ticker:              time.NewTicker(learnerInterval),
+		healthTicker:        time.NewTicker(DefaultHealthCheckInterval),
+		maxReconnectRetries: DefaultMaxReconnectRetries,
+		reconnectBaseDelay:  DefaultReconnectBaseDelay,
+		reconnectMaxDelay:   DefaultReconnectMaxDelay,
 	}
 }
 
@@ -199,14 +223,24 @@ func (mgr *PoolManager) EnsureMinConnections(ctx context.Context) error {
 	return nil
 }
 
-// DoWork runs the learner on each tick and applies its decision.
-// Between ticks, returns 0 (nothing to do).
-// On tick: calls learner.Evaluate, then Add or Remove one connection.
+// DoWork runs health checks and the learner on their respective tick intervals.
+// Health check (A-02 fix): detects closed connections, removes them, attempts reconnection.
+// Learner: evaluates pool performance and adjusts size.
 func (mgr *PoolManager) DoWork(ctx context.Context) int {
+	work := 0
+
+	// Health check tick (A-02 fix).
+	select {
+	case <-mgr.healthTicker.C:
+		work += mgr.healthCheck(ctx)
+	default:
+	}
+
+	// Learner tick.
 	select {
 	case <-mgr.ticker.C:
 	default:
-		return 0
+		return work
 	}
 
 	snap := mgr.pathMgr.Snapshot(mgr.peerAddr)
@@ -258,13 +292,107 @@ func (mgr *PoolManager) worstConn(snap *pathmgr.PoolSnapshot) uint64 {
 	return worst.ConnID
 }
 
+// healthCheck detects closed connections, removes them, and attempts reconnection
+// with exponential backoff. A-02 fix.
+func (mgr *PoolManager) healthCheck(ctx context.Context) int {
+	work := 0
+
+	// Detect and remove closed connections.
+	conns := mgr.pool.Connections()
+	for _, conn := range conns {
+		if conn.IsClosed() {
+			_ = mgr.pool.Remove(conn.ID())
+			slog.Warn("poolmgr: removed closed connection",
+				"conn_id", conn.ID(),
+				"peer", mgr.peerAddr,
+			)
+			work++
+		}
+	}
+
+	// Check if pool is under minimum size and attempt reconnection.
+	if mgr.pool.IsUnderMin() {
+		if mgr.pool.Size() == 0 {
+			if !mgr.lastPoolEmpty {
+				slog.Error("poolmgr: pool drained to zero connections",
+					"peer", mgr.peerAddr,
+					"error", ErrNoConnections,
+				)
+				mgr.lastPoolEmpty = true
+			}
+		}
+
+		// Attempt reconnection with exponential backoff.
+		retries := 0
+		for mgr.pool.IsUnderMin() && retries < mgr.maxReconnectRetries {
+			delay := mgr.backoffDelay()
+			if delay > 0 {
+				select {
+				case <-ctx.Done():
+					return work
+				case <-time.After(delay):
+				}
+			}
+
+			conn, err := mgr.dialer(ctx, mgr.peerAddr, mgr.tlsConf, mgr.ccName)
+			if err != nil {
+				mgr.consecutiveFailures++
+				slog.Warn("poolmgr: reconnect failed",
+					"peer", mgr.peerAddr,
+					"attempt", retries+1,
+					"error", err,
+				)
+				retries++
+				continue
+			}
+
+			if addErr := mgr.pool.Add(conn); addErr != nil {
+				_ = conn.Close()
+				retries++
+				continue
+			}
+
+			mgr.consecutiveFailures = 0
+			mgr.lastPoolEmpty = false
+			slog.Info("poolmgr: reconnected",
+				"peer", mgr.peerAddr,
+				"pool_size", mgr.pool.Size(),
+			)
+			work++
+			retries++
+		}
+	} else {
+		mgr.consecutiveFailures = 0
+		mgr.lastPoolEmpty = false
+	}
+
+	return work
+}
+
+// backoffDelay returns the exponential backoff delay based on consecutive failures.
+func (mgr *PoolManager) backoffDelay() time.Duration {
+	if mgr.consecutiveFailures == 0 {
+		return 0
+	}
+	delay := mgr.reconnectBaseDelay
+	for i := 1; i < mgr.consecutiveFailures; i++ {
+		delay *= 2
+		if delay > mgr.reconnectMaxDelay {
+			delay = mgr.reconnectMaxDelay
+			break
+		}
+	}
+	return delay
+}
+
 // Name returns the agent name.
 func (mgr *PoolManager) Name() string {
 	return "pool-manager"
 }
 
-// Close stops the learner ticker.
+// Close stops the learner and health check tickers.
 func (mgr *PoolManager) Close() error {
 	mgr.ticker.Stop()
+	mgr.healthTicker.Stop()
 	return nil
 }
