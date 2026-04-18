@@ -226,6 +226,102 @@ func TestNew_InvalidSocketReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "connect to SPIRE agent")
 }
 
+// --- F-031: SVID Continuous Rotation Tests ---
+
+func TestSPIFFESource_StartWatch_InitialFetch(t *testing.T) {
+	x509Ctx := buildX509Context(t)
+	mock := &mockWorkloadClient{x509Ctx: x509Ctx}
+	src := identity.NewWithClient(mock)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := src.StartWatch(ctx)
+	require.NoError(t, err)
+
+	// TLSConfig should be populated after StartWatch.
+	cfg := src.TLSConfig()
+	require.NotNil(t, cfg, "TLSConfig should be non-nil after StartWatch")
+	assert.Equal(t, uint16(tls.VersionTLS13), cfg.MinVersion)
+
+	// Clean up watcher.
+	cancel()
+	require.NoError(t, src.Close())
+}
+
+func TestSPIFFESource_StartWatch_ConfigUpdated(t *testing.T) {
+	x509Ctx := buildX509Context(t)
+	mock := &mockWorkloadClient{x509Ctx: x509Ctx}
+	src := identity.NewWithClient(mock)
+	src.SetWatchInterval(10 * time.Millisecond)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := src.StartWatch(ctx)
+	require.NoError(t, err)
+
+	cfg1 := src.TLSConfig()
+	require.NotNil(t, cfg1)
+
+	// Wait for one watch tick to re-fetch. The config should still be valid.
+	time.Sleep(50 * time.Millisecond)
+
+	cfg2 := src.TLSConfig()
+	require.NotNil(t, cfg2)
+	// Config should still be TLS 1.3.
+	assert.Equal(t, uint16(tls.VersionTLS13), cfg2.MinVersion)
+
+	cancel()
+	require.NoError(t, src.Close())
+}
+
+func TestSPIFFESource_StartWatch_StopsOnCancel(t *testing.T) {
+	x509Ctx := buildX509Context(t)
+	mock := &mockWorkloadClient{x509Ctx: x509Ctx}
+	src := identity.NewWithClient(mock)
+	src.SetWatchInterval(10 * time.Millisecond)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	err := src.StartWatch(ctx)
+	require.NoError(t, err)
+
+	// Cancel the context — watcher should stop.
+	cancel()
+
+	// Close should not hang (watcher must have stopped).
+	done := make(chan error, 1)
+	go func() { done <- src.Close() }()
+
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("Close blocked — watcher did not stop on context cancellation")
+	}
+}
+
+func TestSPIFFESource_StartWatch_InitialFetchError(t *testing.T) {
+	mock := &mockWorkloadClient{err: errors.New("agent unreachable")}
+	src := identity.NewWithClient(mock)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := src.StartWatch(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "initial fetch")
+}
+
+func TestSPIFFESource_TLSConfig_NilBeforeWatch(t *testing.T) {
+	mock := &mockWorkloadClient{}
+	src := identity.NewWithClient(mock)
+
+	cfg := src.TLSConfig()
+	assert.Nil(t, cfg, "TLSConfig should be nil before StartWatch is called")
+}
+
 func TestNew_DefaultSocket(t *testing.T) {
 	// Empty socketPath → default is used. workloadapi.New succeeds (lazy dial).
 	// We cannot test the happy-path return without a live agent, so we verify

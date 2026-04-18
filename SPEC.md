@@ -62,7 +62,7 @@ Hyperspace is a high-performance, Go-native publish/subscribe messaging platform
 - [ ] `LogBuffer` supports three-term rotation: when the active term is full, the writer atomically rotates to the next clean term
 - [ ] `Appender.Append([]byte) (int64, error)` performs a single atomic CAS on the tail counter; no mutex required
 - [ ] `Reader.Poll(handler FragmentHandler, limit int) int` reads up to `limit` messages from the current term without copying bytes into a new buffer
-- [ ] Frame header format: `frameLength int32 | flags uint8 | type uint8 | streamId int32 | sessionId int32 | reservedValue int64` (24 bytes total)
+- [ ] Frame header format (32 bytes total, ADR-011): `frame_length int32 (LE) | version uint8 | flags uint8 (BEGIN=0x80, END=0x40) | frame_type uint16 (LE) | term_offset int32 (LE) | session_id int32 (LE) | stream_id int32 (LE) | term_id int32 (LE) | reserved_val int64 (LE, reserved for future extensions)`
 - [ ] All log buffer files created with `os.OpenFile(..., os.O_RDWR|os.O_CREATE, 0600)` — not world-readable
 - [ ] `pkg/logbuffer` test coverage ≥ 90%
 - [ ] Benchmark: `BenchmarkAppender` demonstrates ≥ 10 million appends/second on a single core (informational; not a gate)

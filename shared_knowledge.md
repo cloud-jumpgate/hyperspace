@@ -322,3 +322,35 @@ After `pollBroadcast` detects `ErrLapped`, `reconcileAfterLap()` re-queries the 
 
 ### A-05: Adaptive pollBroadcast Backoff
 `pollBroadcast` starts sleeping at 100us and increases to 1ms after 10 consecutive idle cycles. Any received message resets the backoff to 100us. This reduces CPU usage during idle periods while maintaining low latency when messages are flowing.
+
+---
+
+## 2026-04-18 -- CTO -- Sprint S14: SVID Watch Pattern (ADR-008)
+
+### SVID Continuous Rotation via StartWatch
+
+`SPIFFESource.StartWatch(ctx)` replaces the one-shot `Fetch()` model for production use. It:
+
+1. Performs an initial `Fetch()` to populate the TLS config immediately
+2. Starts a background goroutine that periodically re-fetches the X509Context from the SPIRE Agent
+3. On each successful re-fetch, atomically swaps the stored `*tls.Config` via `sync/atomic.Pointer[tls.Config]`
+4. Stops cleanly when the context is cancelled or `Close()` is called
+
+**Usage pattern:**
+```go
+src, err := identity.New(ctx, socketPath)
+if err != nil { return err }
+
+if err := src.StartWatch(ctx); err != nil { return err }
+
+// Always get the latest TLS config:
+cfg := src.TLSConfig()
+```
+
+**Key properties:**
+- `TLSConfig()` is lock-free (atomic pointer load) — safe to call from the Sender hot path
+- The watcher goroutine honours context cancellation and `Close()`
+- `goleak.VerifyTestMain` verifies no goroutine leak
+- The `SetWatchInterval` test helper allows fast watch ticks in unit tests
+
+**Impact on Pool Manager:** Pool Manager should call `src.TLSConfig()` when opening new connections. The returned config is always fresh. No explicit rotation callback is needed — the atomic swap ensures consumers always see the latest cert.

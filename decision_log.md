@@ -14,6 +14,12 @@
 | ADR-004 | SPIFFE/SPIRE for workload identity (full integration) | Accepted | 2026-04-17 | Harness Architect |
 | ADR-005 | Embedded driver mode for testing | Accepted | 2026-04-17 | Harness Architect |
 | ADR-006 | Real AWS integrations from day one | Accepted | 2026-04-17 | Harness Architect |
+| ADR-007 | DRL fallback algorithm: BBRv3, not CUBIC | Accepted | 2026-04-18 | CTO |
+| ADR-008 | SVID lifecycle: WatchX509Context for continuous rotation | Accepted | 2026-04-18 | CTO |
+| ADR-009 | Send failure handling: retry with back-pressure propagation | Accepted | 2026-04-18 | CTO |
+| ADR-010 | Inbound TLS and SPIFFE ID validation on Accept | Accepted | 2026-04-18 | CTO |
+| ADR-011 | Frame header canonical size: 32 bytes | Accepted | 2026-04-18 | CTO |
+| ADR-012 | TLS MinVersion=0 must be rejected explicitly | Accepted | 2026-04-18 | CTO |
 
 ---
 
@@ -308,3 +314,215 @@ No interface stubs that return hardcoded values are accepted as production code.
 #### Review Trigger
 
 Re-evaluate if: Localstack is discontinued or falls significantly behind AWS API parity (> 6 months behind on a used API).
+
+---
+
+### ADR-007: DRL Fallback Algorithm — BBRv3, Not CUBIC
+
+**Status:** Accepted
+**Date:** 2026-04-18
+**Author:** CTO
+**Supersedes:** Clarifies ADR-003
+
+#### Context
+
+ADR-003 specifies that the DRL congestion controller falls back to BBRv3 when ONNX inference fails or times out. The Architecture Evaluator (finding F-001) discovered that the implementation falls back to CUBIC instead. The `DRLController.runPolicy` method delegates to `d.fallback.CongestionWindow()` where `fallback` is a `cubicWrapper` wrapping `cubic.New(...)`.
+
+This is an ADR conformance violation. BBRv3 was chosen as the fallback because it shares DRL's bandwidth-probing philosophy — a CUBIC fallback produces fundamentally different congestion window dynamics (loss-based vs model-based), creating unpredictable behaviour transitions.
+
+#### Decision
+
+Fix the DRL fallback to use BBRv3. Replace the `cubicWrapper` with a BBRv3 instance created via `cc.New("bbrv3", initialCwnd, minRTT)`. When inference fails or exceeds the 5 us deadline, the DRL controller delegates to BBRv3's congestion window. All DRL event callbacks (OnPacketSent, OnPacketAcked, OnPacketLost, OnRTTUpdate) must also be forwarded to the BBRv3 fallback to keep its state current.
+
+#### Consequences
+
+- Fallback behaviour is now consistent with the DRL controller's bandwidth-probing design
+- BBRv3 fallback will produce slightly different window dynamics than the previous CUBIC fallback during inference timeout periods
+- No API changes — the `DRLController` still implements `cc.CongestionControl`
+
+#### Review Trigger
+
+Re-evaluate if DRL training results indicate CUBIC produces better fallback behaviour than BBRv3 in specific network conditions.
+
+---
+
+### ADR-008: SVID Lifecycle — WatchX509Context for Continuous Rotation
+
+**Status:** Accepted
+**Date:** 2026-04-18
+**Author:** CTO
+**Supersedes:** Clarifies ADR-004
+
+#### Context
+
+ADR-004 specifies Watch API semantics for SVID rotation. The Architecture Evaluator (finding F-002) discovered that `SPIFFESource` implements only `Fetch()` — a one-shot retrieval. In production, SPIRE issues SVIDs with short TTLs (typically 1 hour). Without Watch, all QUIC connections will fail after SVID expiry because the TLS credentials become invalid.
+
+The go-spiffe library provides `workloadapi.WatchX509Context()` which continuously receives fresh SVIDs before expiry, enabling zero-downtime cert rotation.
+
+#### Decision
+
+Replace the one-shot `FetchX509Context` model with `WatchX509Context`. The `SPIFFESource` must:
+
+1. Start a background goroutine calling `workloadapi.WatchX509Context(ctx, watcher)` where the watcher implements `workloadapi.X509ContextWatcher`
+2. On each `OnX509ContextUpdate`, atomically update the stored `*tls.Config` via `sync/atomic.Pointer[tls.Config]`
+3. Expose `TLSConfig() *tls.Config` that always returns the latest live config
+4. Stop cleanly when the context is cancelled
+
+The `Fetch()` method is retained for initial bootstrap (blocking until the first SVID is received) but all subsequent rotations use the Watch path.
+
+#### Consequences
+
+- Zero-downtime cert rotation — Pool Manager reads fresh TLS config on every new connection
+- Background goroutine must be lifecycle-managed (context cancellation, goleak verification)
+- Atomic pointer swap means consumers never hold a stale config reference
+
+#### Review Trigger
+
+Re-evaluate if go-spiffe deprecates `WatchX509Context` or introduces a superior rotation API.
+
+---
+
+### ADR-009: Send Failure Handling — Retry with Back-Pressure Propagation
+
+**Status:** Accepted
+**Date:** 2026-04-18
+**Author:** CTO
+**Supersedes:** —
+
+#### Context
+
+The Architecture Evaluator (finding F-003) identified that when `conn.Send()` returns an error, the Sender silently drops the frame. The frame has already been consumed from the log buffer (the reader advanced past it). There is no retry, no counter increment, and no signal to the publisher. This is a data-loss path.
+
+Silent frame drop is unacceptable for a messaging platform that claims reliable delivery. The design must acknowledge that QUIC send failures happen (congestion, connection closure, stream limits) and handle them explicitly.
+
+#### Decision
+
+When `conn.Send(data)` returns an error:
+
+1. **Retry on the next connection** in the gathered pool, up to 3 attempts (round-robin across available connections)
+2. **If all 3 attempts fail**: increment `CtrLostFrames` counter and log at `slog.Error` with connection IDs tried
+3. **Back-pressure propagation**: after 3 consecutive failed frames for a publication, signal back-pressure via the `ErrBackPressure` return code to the publication's next `Offer()` call. Use a per-publication failure counter, reset on success.
+
+This approach prioritises delivery over latency: a single-connection failure is retried transparently, but persistent failures are surfaced to the publisher so it can take application-level action (slow down, buffer, alert).
+
+#### Consequences
+
+- Frame delivery reliability increases — single-connection failures are transparent
+- `CtrLostFrames` counter provides operational visibility into persistent failures
+- Back-pressure propagation gives publishers a signal to slow down
+- Additional complexity in the Sender's hot path (retry loop, failure counter) — bounded to 3 attempts
+
+#### Review Trigger
+
+Re-evaluate if the retry loop introduces measurable latency on the happy path (> 1 us per frame when no failure occurs).
+
+---
+
+### ADR-010: Inbound TLS and SPIFFE ID Validation on Accept
+
+**Status:** Accepted
+**Date:** 2026-04-18
+**Author:** CTO
+**Supersedes:** —
+
+#### Context
+
+The Architecture Evaluator (finding F-004) identified that `Accept()` wraps an incoming `quic.Conn` without validating TLS state. It does not check `HandshakeComplete`, peer certificate presence, or SPIFFE ID. If the QUIC listener's TLS config is misconfigured (or a future code change weakens it), anonymous connections could be accepted.
+
+Defence in depth requires validating the security state at every trust boundary, not relying solely on upstream configuration being correct.
+
+#### Decision
+
+After `listener.Accept(ctx)` returns a `quic.Connection`:
+
+1. Verify `conn.ConnectionState().TLS.HandshakeComplete == true` — if false, close and return error
+2. Verify `conn.ConnectionState().TLS.PeerCertificates` is non-empty — if empty, close and return error
+3. If `RequireSPIFFE` is true (configurable in `QUICConfig`), verify that at least one peer certificate contains a SPIFFE URI SAN (`spiffe://` scheme in `Certificate.URIs`)
+4. Reject connections that fail validation with a descriptive error
+
+`RequireSPIFFE` defaults to `false` for backward compatibility. Production deployments must set it to `true`.
+
+#### Consequences
+
+- Defence-in-depth TLS validation on inbound connections
+- SPIFFE ID validation ensures only trusted workloads can connect
+- `RequireSPIFFE` configuration flag allows gradual rollout
+- Slight increase in Accept() latency (certificate parsing) — negligible compared to TLS handshake
+
+#### Review Trigger
+
+Re-evaluate if SPIFFE trust domain federation requires accepting SVIDs from multiple trust domains.
+
+---
+
+### ADR-011: Frame Header Canonical Size — 32 Bytes
+
+**Status:** Accepted
+**Date:** 2026-04-18
+**Author:** CTO
+**Supersedes:** SPEC.md F-001 frame header specification
+
+#### Context
+
+SPEC.md F-001 specifies a 24-byte frame header. The implementation uses 32 bytes, adding `version` (1 byte), expanding `type` from `uint8` to `uint16`, and including `termOffset` (4 bytes) and `termID` (4 bytes). The original spec had a `reservedValue int64` (8 bytes) that is retained.
+
+The Architecture Evaluator (finding F-015) notes that the additional fields are required for correct receiver operation (the receiver needs `termOffset` to write at the correct position in the image buffer) and protocol versioning.
+
+#### Decision
+
+The 32-byte frame header is the canonical Hyperspace wire format:
+
+| Field | Size | Type | Encoding |
+|---|---|---|---|
+| frame_length | 4 bytes | int32 | little-endian |
+| version | 1 byte | uint8 | — |
+| flags | 1 byte | uint8 | BEGIN=0x80, END=0x40 |
+| frame_type | 2 bytes | uint16 | little-endian |
+| term_offset | 4 bytes | int32 | little-endian |
+| session_id | 4 bytes | int32 | little-endian |
+| stream_id | 4 bytes | int32 | little-endian |
+| term_id | 4 bytes | int32 | little-endian |
+| reserved_val | 8 bytes | int64 | little-endian |
+
+SPEC.md must be updated to reflect this canonical layout. The `reserved_val` field is reserved for future extensions (e.g., sequence number for ordered delivery, encryption nonce).
+
+#### Consequences
+
+- SPEC.md and implementation are now consistent
+- 32-byte header is 8 bytes larger than original spec — negligible overhead at 1M msg/s
+- `reserved_val` provides extension point without wire format change
+
+#### Review Trigger
+
+Re-evaluate when the reserved field is allocated for a specific extension.
+
+---
+
+### ADR-012: TLS MinVersion=0 Must Be Rejected Explicitly
+
+**Status:** Accepted
+**Date:** 2026-04-18
+**Author:** CTO
+**Supersedes:** —
+
+#### Context
+
+The Architecture Evaluator (finding F-005) identified that `validateTLSConfig()` in `pkg/transport/quic/conn.go` accepts `MinVersion == 0`. In Go's `crypto/tls` package, a zero `MinVersion` defaults to TLS 1.2. While `enforceALPN()` always overrides `MinVersion` to TLS 1.3, the validation function should reject zero to prevent a future code path from bypassing `enforceALPN` and inadvertently allowing TLS 1.2.
+
+Defence in depth: validation should catch configuration errors at the earliest possible point, not rely on a downstream function to fix them.
+
+#### Decision
+
+In `validateTLSConfig`, treat `MinVersion == 0` as a configuration error. The function must panic with a clear message: `"hyperspace: tls.Config.MinVersion must be set explicitly; zero value permits TLS 1.2"`. This check must come before the existing `MinVersion < tls.VersionTLS13` check.
+
+A panic (not an error return) is appropriate because this is a programmer error — a misconfigured `tls.Config` should never reach production, and a panic makes the error impossible to ignore during development and testing.
+
+#### Consequences
+
+- Zero-value `MinVersion` is caught at creation time, not silently overridden
+- Existing tests that use `MinVersion: 0` must be updated to set `MinVersion: tls.VersionTLS13`
+- Defence-in-depth: no code path can bypass TLS 1.3 enforcement
+
+#### Review Trigger
+
+Re-evaluate if Go changes the default TLS minimum version to 1.3 or higher.

@@ -15,6 +15,9 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log/slog"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
@@ -39,8 +42,24 @@ type workloadClient interface {
 }
 
 // SPIFFESource fetches workload identity from the SPIRE Workload API.
+// ADR-008: supports both one-shot Fetch and continuous Watch for SVID rotation.
 type SPIFFESource struct {
 	client workloadClient
+
+	// liveCfg holds the latest TLS config, atomically updated by the watcher.
+	liveCfg atomic.Pointer[tls.Config]
+
+	// watchCancel stops the background watcher goroutine.
+	watchCancel context.CancelFunc
+	// watchDone is closed when the watcher goroutine exits.
+	watchDone chan struct{}
+
+	// initOnce ensures the first config is set before TLSConfig returns.
+	initOnce sync.Once
+	initDone chan struct{}
+
+	// watchIntervalOverride overrides the default watch interval for testing.
+	watchIntervalOverride time.Duration
 }
 
 // New connects to the SPIRE Workload API socket.
@@ -60,12 +79,18 @@ func New(ctx context.Context, socketPath string) (*SPIFFESource, error) {
 	}
 
 	slog.Info("identity: connected to SPIRE Workload API", "socket", socketPath)
-	return &SPIFFESource{client: client}, nil
+	return &SPIFFESource{
+		client:   client,
+		initDone: make(chan struct{}),
+	}, nil
 }
 
 // newWithClient creates a SPIFFESource with an injected client (for testing).
 func newWithClient(client workloadClient) *SPIFFESource {
-	return &SPIFFESource{client: client}
+	return &SPIFFESource{
+		client:   client,
+		initDone: make(chan struct{}),
+	}
 }
 
 // Fetch retrieves the current workload identity from the SPIRE agent.
@@ -98,8 +123,91 @@ func (s *SPIFFESource) Fetch(ctx context.Context) (*WorkloadIdentity, error) {
 	}, nil
 }
 
-// Close releases the Workload API connection.
+// TLSConfig returns the latest TLS config. If Watch has been called, this
+// returns the most recently received config (atomically updated). If Watch
+// has not been called, returns nil.
+func (s *SPIFFESource) TLSConfig() *tls.Config {
+	return s.liveCfg.Load()
+}
+
+// StartWatch begins continuously watching for SVID rotation.
+// ADR-008: uses a background goroutine that receives SVID updates and
+// atomically swaps the TLS config. The watcher stops when ctx is cancelled
+// or Close is called.
+func (s *SPIFFESource) StartWatch(ctx context.Context) error {
+	// Perform initial fetch to populate liveCfg before starting the watcher.
+	wi, err := s.Fetch(ctx)
+	if err != nil {
+		return fmt.Errorf("identity: initial fetch for watch: %w", err)
+	}
+	s.liveCfg.Store(wi.TLSConfig)
+	s.initOnce.Do(func() { close(s.initDone) })
+
+	watchCtx, cancel := context.WithCancel(ctx)
+	s.watchCancel = cancel
+	s.watchDone = make(chan struct{})
+
+	go s.runWatch(watchCtx)
+
+	slog.Info("identity: SVID watch started")
+	return nil
+}
+
+// watchInterval is the default interval between SVID re-fetch attempts.
+// Configurable via the watchIntervalOverride field for testing.
+const defaultWatchInterval = 30 * time.Minute
+
+// runWatch is the background goroutine that watches for X509Context updates.
+func (s *SPIFFESource) runWatch(ctx context.Context) {
+	defer close(s.watchDone)
+
+	interval := defaultWatchInterval
+	if s.watchIntervalOverride > 0 {
+		interval = s.watchIntervalOverride
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			x509Ctx, err := s.client.FetchX509Context(ctx)
+			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
+				slog.Warn("identity: watch re-fetch failed", "error", err)
+				continue
+			}
+			if len(x509Ctx.SVIDs) == 0 {
+				slog.Warn("identity: watch re-fetch returned no SVIDs")
+				continue
+			}
+			svid := x509Ctx.SVIDs[0]
+			tlsCfg, err := buildTLSConfig(svid, x509Ctx)
+			if err != nil {
+				slog.Warn("identity: watch build TLS config failed", "error", err)
+				continue
+			}
+			s.liveCfg.Store(tlsCfg)
+			slog.Debug("identity: SVID rotated",
+				"spiffe_id", svid.ID.String(),
+			)
+		}
+	}
+}
+
+// Close releases the Workload API connection and stops the watcher goroutine.
 func (s *SPIFFESource) Close() error {
+	// Stop the watcher goroutine if running.
+	if s.watchCancel != nil {
+		s.watchCancel()
+	}
+	if s.watchDone != nil {
+		<-s.watchDone
+	}
 	if err := s.client.Close(); err != nil {
 		return fmt.Errorf("identity: close Workload API client: %w", err)
 	}

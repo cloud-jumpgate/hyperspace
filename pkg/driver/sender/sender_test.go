@@ -511,6 +511,135 @@ func TestNew_DefaultFragmentsPerBatch(t *testing.T) {
 	}
 }
 
+// --- F-032: Send Retry with Back-Pressure Propagation ---
+
+func TestDoWork_RetryOnSingleConnFailure(t *testing.T) {
+	cond, ring := newTestConductorAndRing(t)
+
+	// Two connections: first fails, second succeeds.
+	mc1 := newMockConn(1)
+	mc1.sendErr = net.ErrClosed
+	mc2 := newMockConn(2)
+
+	p := pool.New("peer1", 1, 4)
+	if err := p.Add(mc1); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+	if err := p.Add(mc2); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+
+	s := sender.New(cond, arbitrator.NewRandom(nil), 1200)
+	s.AddPool("peer1", p)
+
+	writeAddPublication(t, ring, 1, 100)
+	cond.DoWork(context.Background())
+	pubs := cond.Publications()
+	appendToPublication(t, pubs[0], []byte("retry-test"))
+
+	n := s.DoWork(context.Background())
+	// Frame should be sent on the second connection.
+	if n != 1 {
+		t.Fatalf("expected 1 frame sent (retried), got %d", n)
+	}
+	if mc2.SentCount() != 1 {
+		t.Fatalf("expected 1 frame on mc2, got %d", mc2.SentCount())
+	}
+}
+
+func TestDoWork_AllConnectionsFailIncreasesLostFrames(t *testing.T) {
+	cond, ring := newTestConductorAndRing(t)
+
+	mc := newMockConn(1)
+	mc.sendErr = net.ErrClosed
+
+	p := pool.New("peer1", 1, 4)
+	if err := p.Add(mc); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+
+	s := sender.New(cond, arbitrator.NewRandom(nil), 1200)
+	s.AddPool("peer1", p)
+
+	writeAddPublication(t, ring, 1, 100)
+	cond.DoWork(context.Background())
+	pubs := cond.Publications()
+	appendToPublication(t, pubs[0], []byte("fail-all"))
+
+	s.DoWork(context.Background())
+
+	// LostFrames should be incremented.
+	if s.LostFrames.Load() != 1 {
+		t.Errorf("LostFrames: got %d, want 1", s.LostFrames.Load())
+	}
+}
+
+func TestDoWork_BackPressureAfterConsecutiveFailures(t *testing.T) {
+	cond, ring := newTestConductorAndRing(t)
+
+	mc := newMockConn(1)
+	mc.sendErr = net.ErrClosed
+
+	p := pool.New("peer1", 1, 4)
+	if err := p.Add(mc); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+
+	s := sender.New(cond, arbitrator.NewRandom(nil), 1200)
+	s.AddPool("peer1", p)
+
+	writeAddPublication(t, ring, 1, 100)
+	cond.DoWork(context.Background())
+	pubs := cond.Publications()
+
+	// Append 3 messages — each will fail, incrementing consecutive failure counter.
+	for i := 0; i < 3; i++ {
+		appendToPublication(t, pubs[0], []byte("fail"))
+	}
+
+	// Process all 3 frames — each triggers all-connection-fail.
+	for i := 0; i < 3; i++ {
+		s.DoWork(context.Background())
+	}
+
+	// After 3 consecutive failures, back-pressure should be flagged.
+	if !s.BackPressureFlags[pubs[0].PublicationID] {
+		t.Error("expected back-pressure flag after 3 consecutive failures")
+	}
+}
+
+func TestDoWork_SuccessResetsFailureCounter(t *testing.T) {
+	cond, ring := newTestConductorAndRing(t)
+
+	mc := newMockConn(1)
+	p := pool.New("peer1", 1, 4)
+	if err := p.Add(mc); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+
+	s := sender.New(cond, arbitrator.NewRandom(nil), 1200)
+	s.AddPool("peer1", p)
+
+	writeAddPublication(t, ring, 1, 100)
+	cond.DoWork(context.Background())
+	pubs := cond.Publications()
+
+	// First: fail.
+	mc.sendErr = net.ErrClosed
+	appendToPublication(t, pubs[0], []byte("fail"))
+	s.DoWork(context.Background())
+
+	// Then: succeed.
+	mc.sendErr = nil
+	appendToPublication(t, pubs[0], []byte("succeed"))
+	s.DoWork(context.Background())
+
+	// Back-pressure should NOT be flagged (reset on success).
+	if s.BackPressureFlags[pubs[0].PublicationID] {
+		t.Error("back-pressure flag should be reset after successful send")
+	}
+}
+
 func TestNew_WithFragmentsPerBatch(t *testing.T) {
 	cond, ring := newTestConductorAndRing(t)
 

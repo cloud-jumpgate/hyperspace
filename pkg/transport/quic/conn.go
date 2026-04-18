@@ -119,12 +119,17 @@ func quicConfig() *quic.Config {
 }
 
 // validateTLSConfig enforces Hyperspace TLS requirements.
+// ADR-012: MinVersion==0 is treated as a configuration error because Go defaults
+// zero to TLS 1.2, which violates the TLS 1.3 minimum policy.
 func validateTLSConfig(tlsConf *tls.Config) error {
 	if tlsConf == nil {
 		return fmt.Errorf("quictr: tls.Config must not be nil")
 	}
-	if tlsConf.MinVersion != 0 && tlsConf.MinVersion < tls.VersionTLS13 {
-		return fmt.Errorf("quictr: MinVersion must be tls.VersionTLS13 or unset, got 0x%04x", tlsConf.MinVersion)
+	if tlsConf.MinVersion == 0 {
+		panic("hyperspace: tls.Config.MinVersion must be set explicitly; zero value permits TLS 1.2")
+	}
+	if tlsConf.MinVersion < tls.VersionTLS13 {
+		return fmt.Errorf("quictr: MinVersion must be tls.VersionTLS13, got 0x%04x", tlsConf.MinVersion)
 	}
 	return nil
 }
@@ -158,9 +163,69 @@ func Dial(ctx context.Context, addr string, tlsConf *tls.Config, ccName string) 
 	return newQUICConnection(conn), nil
 }
 
-// Accept wraps an incoming quic-go connection.
-func Accept(conn *quic.Conn) Connection {
-	return newQUICConnection(conn)
+// ErrHandshakeIncomplete is returned when Accept receives a connection with
+// an incomplete TLS handshake.
+var ErrHandshakeIncomplete = errors.New("quictr: TLS handshake not complete on accepted connection")
+
+// ErrNoPeerCertificates is returned when Accept receives a connection without
+// any peer certificates (anonymous connection).
+var ErrNoPeerCertificates = errors.New("quictr: no peer certificates on accepted connection")
+
+// ErrNoSPIFFEID is returned when RequireSPIFFE is true but the peer certificate
+// does not contain a spiffe:// URI SAN.
+var ErrNoSPIFFEID = errors.New("quictr: peer certificate does not contain a SPIFFE ID URI SAN")
+
+// AcceptConfig configures the Accept behaviour.
+type AcceptConfig struct {
+	// RequireSPIFFE when true verifies that the peer certificate contains a
+	// SPIFFE URI SAN (spiffe:// scheme). Default false for backward compatibility.
+	RequireSPIFFE bool
+}
+
+// Accept wraps an incoming quic-go connection with TLS validation.
+// ADR-010: verifies HandshakeComplete, peer certificate presence, and optionally
+// SPIFFE ID. Returns an error if validation fails; the connection is closed.
+func Accept(conn *quic.Conn, cfgs ...AcceptConfig) (Connection, error) {
+	var cfg AcceptConfig
+	if len(cfgs) > 0 {
+		cfg = cfgs[0]
+	}
+
+	state := conn.ConnectionState()
+
+	// Verify TLS handshake completed.
+	if !state.TLS.HandshakeComplete {
+		_ = conn.CloseWithError(1, "TLS handshake incomplete")
+		return nil, ErrHandshakeIncomplete
+	}
+
+	// Verify peer certificates are present.
+	if len(state.TLS.PeerCertificates) == 0 {
+		_ = conn.CloseWithError(2, "no peer certificates")
+		return nil, ErrNoPeerCertificates
+	}
+
+	// Optionally verify SPIFFE ID in peer certificate.
+	if cfg.RequireSPIFFE {
+		hasSPIFFE := false
+		for _, cert := range state.TLS.PeerCertificates {
+			for _, u := range cert.URIs {
+				if u.Scheme == "spiffe" {
+					hasSPIFFE = true
+					break
+				}
+			}
+			if hasSPIFFE {
+				break
+			}
+		}
+		if !hasSPIFFE {
+			_ = conn.CloseWithError(3, "no SPIFFE ID in peer certificate")
+			return nil, ErrNoSPIFFEID
+		}
+	}
+
+	return newQUICConnection(conn), nil
 }
 
 // newQUICConnection initialises a QUICConnection and starts background goroutines.

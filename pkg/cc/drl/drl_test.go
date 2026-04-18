@@ -49,8 +49,8 @@ func (s slowPolicy) Infer(_ []float32) (float32, error) {
 }
 func (s slowPolicy) Close() error { return nil }
 
-// TestDeadlineFallbackToCubic verifies that a slow policy causes CUBIC fallback.
-func TestDeadlineFallbackToCubic(t *testing.T) {
+// TestDeadlineFallbackToBBRv3 verifies that a slow policy causes BBRv3 fallback (ADR-007).
+func TestDeadlineFallbackToBBRv3(t *testing.T) {
 	initialCwnd := 20 * mss
 	// Use a slow policy that sleeps 10 µs (> 5 µs deadline).
 	slow := slowPolicy{sleep: 15 * time.Millisecond} // well above 5µs for CI reliability
@@ -300,6 +300,16 @@ func TestOnRTTUpdateUpdatesBaseRTT(t *testing.T) {
 	rate := d.PacingRate()
 	if rate < 0 {
 		t.Errorf("PacingRate should be >= 0 after RTT update: %d", rate)
+	}
+}
+
+// TestFallbackIsBBRv3 verifies the DRL fallback is BBRv3, not CUBIC (ADR-007).
+func TestFallbackIsBBRv3(t *testing.T) {
+	initialCwnd := 20 * mss
+	d := drl.NewWithPolicy(initialCwnd, 50*time.Millisecond, drl.NullPolicy{})
+	name := drl.FallbackName(d)
+	if name != "bbrv3" {
+		t.Errorf("DRL fallback algorithm = %q, want %q (ADR-007)", name, "bbrv3")
 	}
 }
 

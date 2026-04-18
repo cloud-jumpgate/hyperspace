@@ -165,6 +165,53 @@ This pattern is not directly implemented in Hyperspace v1 (Hyperspace uses SPIFF
 
 ---
 
+## TLS MinVersion=0 Rejection (ADR-012)
+
+**Added:** 2026-04-18 (Sprint S14)
+
+Go's `crypto/tls` package defaults `MinVersion` to TLS 1.2 when it is zero. This is dangerous for Hyperspace because all QUIC connections must use TLS 1.3. A zero `MinVersion` that bypasses `enforceALPN()` would silently downgrade to TLS 1.2.
+
+**Enforcement:** `validateTLSConfig()` in `pkg/transport/quic/conn.go` now panics when `MinVersion == 0`:
+
+```go
+if cfg.MinVersion == 0 {
+    panic("hyperspace: tls.Config.MinVersion must be set explicitly; zero value permits TLS 1.2")
+}
+```
+
+A panic (not an error return) is used because this is a programmer error that must be caught during development, not silently handled at runtime. Any `tls.Config` passed to `Dial()` or used by a listener must set `MinVersion: tls.VersionTLS13` explicitly.
+
+**Impact on tests:** All test `tls.Config` structs must set `MinVersion: tls.VersionTLS13`. The `clientTLSConfig()` and `serverTLSConfig()` helpers in `testcerts_test.go` already do this.
+
+---
+
+## Inbound SPIFFE ID Validation (ADR-010)
+
+**Added:** 2026-04-18 (Sprint S14)
+
+`Accept()` in `pkg/transport/quic/conn.go` now performs defence-in-depth validation on incoming QUIC connections:
+
+1. **HandshakeComplete check:** Verifies `conn.ConnectionState().TLS.HandshakeComplete == true`. Rejects incomplete handshakes.
+2. **Peer certificate check:** Verifies `conn.ConnectionState().TLS.PeerCertificates` is non-empty. Rejects anonymous connections.
+3. **SPIFFE ID check (optional):** When `AcceptConfig{RequireSPIFFE: true}` is passed, verifies that at least one peer certificate contains a `spiffe://` URI SAN in `Certificate.URIs`.
+
+**Configuration:**
+
+```go
+// Production: require SPIFFE ID
+conn, err := quictr.Accept(rawConn, quictr.AcceptConfig{RequireSPIFFE: true})
+
+// Development/testing: only require mTLS
+conn, err := quictr.Accept(rawConn)
+```
+
+**Error types:**
+- `ErrHandshakeIncomplete` — TLS handshake not completed
+- `ErrNoPeerCertificates` — no client certificate presented
+- `ErrNoSPIFFEID` — no SPIFFE URI SAN in peer certificate (only when RequireSPIFFE=true)
+
+---
+
 ## References
 
 - [RFC 9000](https://www.rfc-editor.org/rfc/rfc9000) — QUIC Transport Protocol
