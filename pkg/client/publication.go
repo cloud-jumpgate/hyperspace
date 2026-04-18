@@ -70,15 +70,19 @@ func (p *Publication) Offer(data []byte) (int64, error) {
 	)
 
 	if result == logbuffer.AppendRotation {
-		// Advance to next partition.
-		nextPartIdx := (partIdx + 1) % logbuffer.NumPartitions
-		p.logBuf.SetActivePartitionIndex(int32(nextPartIdx))
-		slog.Debug("publication: term rotation",
-			"publication_id", p.publicationID,
-			"session_id", p.sessionID,
-			"stream_id", p.streamID,
-			"next_partition", nextPartIdx,
-		)
+		// Advance to next partition using CAS loop (C-01 fix).
+		// Multiple goroutines may observe AppendRotation simultaneously; only one
+		// should advance the index. Others will see the updated index on retry.
+		nextPartIdx := int32((partIdx + 1) % logbuffer.NumPartitions)
+		if p.logBuf.CompareAndSwapActivePartitionIndex(int32(partIdx), nextPartIdx) {
+			slog.Debug("publication: term rotation (CAS succeeded)",
+				"publication_id", p.publicationID,
+				"session_id", p.sessionID,
+				"stream_id", p.streamID,
+				"old_partition", partIdx,
+				"new_partition", nextPartIdx,
+			)
+		}
 		return logbuffer.AppendRotation, nil
 	}
 
@@ -111,8 +115,9 @@ func (p *Publication) OfferFragmented(data []byte, maxPayloadLength int) (int64,
 	)
 
 	if result == logbuffer.AppendRotation {
-		nextPartIdx := (partIdx + 1) % logbuffer.NumPartitions
-		p.logBuf.SetActivePartitionIndex(int32(nextPartIdx))
+		// CAS rotation for fragmented path (C-01 fix).
+		nextPartIdx := int32((partIdx + 1) % logbuffer.NumPartitions)
+		p.logBuf.CompareAndSwapActivePartitionIndex(int32(partIdx), nextPartIdx)
 		return logbuffer.AppendRotation, nil
 	}
 

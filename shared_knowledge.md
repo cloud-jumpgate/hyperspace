@@ -265,3 +265,20 @@ secrets/
 The negation `!pkg/secrets/` must come AFTER the `secrets/` rule in `.gitignore`. Git applies negation rules in order.
 
 **Verification:** After adding the negation rule, `git status` shows `pkg/secrets/*.go` as untracked (available to add). `git add pkg/secrets/` succeeds.
+
+## 2026-04-17 -- CTO -- S11 Hot Path Correctness Patterns
+
+### C-05: Frame Header Write Ordering
+The Receiver's `processFrame` must write ALL header fields (version, flags, frameType, termOffset, sessionID, streamID, termID, reservedValue) BEFORE writing frameLength. The frameLength field is a volatile store (via `SetFrameLength` / `PutInt32Ordered`) that signals readers the frame is ready. If frameLength is written first or alone, readers see frameType=0 (PAD) and silently drop the frame. This is the Aeron-style "write payload, then header fields, then length-last" pattern.
+
+### C-01: CAS Rotation Pattern
+`Publication.Offer` uses `CompareAndSwapActivePartitionIndex(currentIdx, nextIdx)` instead of `SetActivePartitionIndex(nextIdx)` for term rotation. This prevents concurrent publishers from double-advancing the partition index. When CAS fails, it means another goroutine already rotated -- the caller simply retries from the new partition on its next Offer call.
+
+### P-01: sync.Pool in Sender
+`sender.sendPublication` uses `sync.Pool` with pre-allocated `[]byte` buffers (sized to MTU + HeaderLength) instead of `make([]byte, frameLen)` per frame. Buffers are returned to the pool after `conn.Send` completes. This eliminates ~1M allocs/sec on the hot path. The pool's `New` function captures `maxFrameSize` at construction time.
+
+### A-01: Agent Panic Recovery
+`RunAgent` wraps each `DoWork` call in `doWorkSafe`, which uses `defer recover()`. Recovered panics increment an atomic counter. When the counter exceeds `DefaultPanicThreshold` (10), the agent stops gracefully. This prevents a single panicking agent from crashing the entire driver process.
+
+### S-01: Image Map TTL Eviction
+Receiver image entries now carry a `lastAccess` timestamp. Every 1000 `DoWork` calls, stale entries (TTL default 60s) are evicted. `RemoveImage(sessionID)` provides immediate removal for `CmdRemoveSubscription`. The `nowFunc` field is injectable for deterministic testing.

@@ -1,6 +1,6 @@
 {
   "project": "hyperspace",
-  "last_updated": "2026-04-17T00:00:00Z",
+  "last_updated": "2026-04-17T10:00:00Z",
   "schema_version": "2.0",
   "_note": "Track at FEATURE level. Sprint-level-only tracking is a schema violation. Every feature must have its own entry with status, evaluator verdicts, and coverage.",
   "features": [
@@ -157,6 +157,61 @@
       "coverage_pct": 85,
       "pr_number": null,
       "notes": "pkg/identity: SPIFFEIdentity, FetchSVID, Watch. Delivered in S9."
+    },
+    {
+      "id": "F-015",
+      "name": "Receiver Complete Frame Header (C-05)",
+      "sprint": "S11",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Fix: receiver writes all header fields, not just payload+frameLength. Readers currently see frameType=0 (PAD) and drop all frames."
+    },
+    {
+      "id": "F-016",
+      "name": "Atomic Term Rotation (C-01)",
+      "sprint": "S11",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Fix: CAS loop on ActivePartitionIndex in Publication.Offer to prevent concurrent corruption."
+    },
+    {
+      "id": "F-017",
+      "name": "Sender Frame Buffer Pool (P-01)",
+      "sprint": "S11",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Fix: sync.Pool of reusable frame buffers in sender.sendPublication instead of make([]byte, frameLen) per frame."
+    },
+    {
+      "id": "F-018",
+      "name": "Agent Panic Recovery (A-01)",
+      "sprint": "S11",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Fix: deferred recover() in RunAgent with panic counter and configurable threshold."
+    },
+    {
+      "id": "F-019",
+      "name": "Image Map TTL Eviction (S-01)",
+      "sprint": "S11",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Fix: TTL-based eviction of stale image log buffers in receiver, triggered periodically."
     }
   ],
   "_status_values": [
