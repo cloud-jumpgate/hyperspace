@@ -1,13 +1,13 @@
 {
   "project": "hyperspace",
-  "last_updated": "2026-04-18",
-  "state": "remediation_in_progress",
-  "current_sprint": "remediation",
+  "last_updated": "2026-04-17T00:00:00Z",
+  "state": "governance_aligned",
+  "current_sprint": "post-S10",
   "sprints_complete": ["S1","S2","S3","S4","S5","S6","S7","S8","S9","S10"],
   "last_session": {
-    "date": "2026-04-18",
-    "agent": "harness-orchestrator",
-    "action": "Harness review completed; remediation branch created; P0/P1/P2 corrective actions in progress"
+    "date": "2026-04-17",
+    "agent": "harness-engineering-team",
+    "action": "v2.0 framework alignment: CLAUDE.md updated to v2.0, progress.json converted to feature-level tracking, HARNESS_QUALITY_REPORT.md created, init.sh created, PR template created, sprint contract template updated, knowledge_base/INDEX.md populated"
   },
   "test_suite": {
     "status": "passing",
@@ -20,8 +20,16 @@
     "hyperspace-stat": "built"
   },
   "open_actions": [
-    "HARNESS_QUALITY_REPORT.md not yet produced",
-    "Security Evaluator not yet invoked for S9",
-    "Architecture Evaluator not yet invoked"
-  ]
+    "Code Evaluator must verify all 14 features (F-001 through F-014)",
+    "Security Evaluator must verify F-013 and F-014",
+    "Architecture Evaluator review overdue (required every 4 sprints)",
+    "Promote features from code_complete to evaluator_pass as verdicts arrive"
+  ],
+  "governance": {
+    "claude_md_version": "2.0",
+    "progress_json_schema": "2.0",
+    "harness_quality_report": "CONDITIONAL PASS",
+    "init_sh": "present",
+    "pr_template": "present"
+  }
 }

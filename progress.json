@@ -1,16 +1,175 @@
 {
   "project": "hyperspace",
-  "last_updated": "2026-04-18",
-  "sprints": [
-    {"id": "S1", "name": "Foundation", "status": "complete"},
-    {"id": "S2", "name": "QUIC Transport", "status": "complete"},
-    {"id": "S3", "name": "Driver Core", "status": "complete"},
-    {"id": "S4", "name": "Path Intelligence", "status": "complete"},
-    {"id": "S5", "name": "Pool Intelligence", "status": "complete"},
-    {"id": "S6", "name": "Client Library", "status": "complete"},
-    {"id": "S7", "name": "Congestion Control", "status": "complete"},
-    {"id": "S8", "name": "Observability", "status": "complete"},
-    {"id": "S9", "name": "AWS + Identity", "status": "complete"},
-    {"id": "S10", "name": "CI/CD + Docs", "status": "complete"}
+  "last_updated": "2026-04-17T00:00:00Z",
+  "schema_version": "2.0",
+  "_note": "Track at FEATURE level. Sprint-level-only tracking is a schema violation. Every feature must have its own entry with status, evaluator verdicts, and coverage.",
+  "features": [
+    {
+      "id": "F-001",
+      "name": "Log Buffer",
+      "sprint": "S1",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "pkg/logbuffer: three-term mmap'd ring buffer, atomic appender, reader. Delivered in S1."
+    },
+    {
+      "id": "F-002",
+      "name": "Ring Buffers and IPC",
+      "sprint": "S1",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "pkg/ipc/ringbuffer (SPSC, MPSC), pkg/ipc/broadcast, pkg/ipc/memmap. Delivered in S1."
+    },
+    {
+      "id": "F-003",
+      "name": "QUIC Transport Adapter",
+      "sprint": "S2",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "pkg/transport/quic: Connection interface, Dial, Listen, TLS 1.3 enforced. Delivered in S2."
+    },
+    {
+      "id": "F-004",
+      "name": "Multi-QUIC Connection Pool",
+      "sprint": "S2",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "pkg/transport/pool: Pool struct with Add/Remove/Connections/Len. Delivered in S2."
+    },
+    {
+      "id": "F-005",
+      "name": "Connection Arbitrator",
+      "sprint": "S2",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "pkg/transport/arbitrator: LowestRTT, LeastOutstanding, Hybrid, Sticky, Random strategies. Delivered in S2."
+    },
+    {
+      "id": "F-006",
+      "name": "Path Manager and Latency Probes",
+      "sprint": "S4",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 95,
+      "pr_number": null,
+      "notes": "pkg/driver/pathmgr: PING/PONG probes, EWMA RTT, atomic PoolSnapshot. Delivered in S4."
+    },
+    {
+      "id": "F-007",
+      "name": "Adaptive Pool Learner",
+      "sprint": "S5",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 96,
+      "pr_number": null,
+      "notes": "pkg/driver/poolmgr: latency-loss correlation model, automatic pool size adjustment. Delivered in S5."
+    },
+    {
+      "id": "F-008",
+      "name": "Driver Agents (Conductor/Sender/Receiver)",
+      "sprint": "S3",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "pkg/driver/conductor, sender, receiver + cmd/hsd/main.go. Delivered in S3."
+    },
+    {
+      "id": "F-009",
+      "name": "Pool Manager Agent",
+      "sprint": "S5",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 96,
+      "pr_number": null,
+      "notes": "pkg/driver/poolmgr: connection lifecycle, cert rotation via SPIRE. Delivered in S5."
+    },
+    {
+      "id": "F-010",
+      "name": "Client Library",
+      "sprint": "S6",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 91,
+      "pr_number": null,
+      "notes": "pkg/client: Client, Publication, Subscription, Image. pkg/channel URI parser. Delivered in S6."
+    },
+    {
+      "id": "F-011",
+      "name": "Congestion Control",
+      "sprint": "S7",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 85,
+      "pr_number": null,
+      "notes": "pkg/cc: CUBIC, BBR, BBRv3, DRL/ONNX stub. Delivered in S2/S7."
+    },
+    {
+      "id": "F-012",
+      "name": "Observability",
+      "sprint": "S8",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "pkg/counters, pkg/obs, cmd/hyperspace-stat. Delivered in S8."
+    },
+    {
+      "id": "F-013",
+      "name": "AWS Integration",
+      "sprint": "S9",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 83,
+      "pr_number": null,
+      "notes": "pkg/discovery (Cloud Map), pkg/config (SSM), pkg/identity (Secrets Manager). Delivered in S9."
+    },
+    {
+      "id": "F-014",
+      "name": "SPIFFE/SPIRE Identity",
+      "sprint": "S9",
+      "status": "code_complete",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": 85,
+      "pr_number": null,
+      "notes": "pkg/identity: SPIFFEIdentity, FetchSVID, Watch. Delivered in S9."
+    }
+  ],
+  "_status_values": [
+    "not_started",
+    "in_progress",
+    "code_complete",
+    "evaluator_pass",
+    "failing"
+  ],
+  "_schema_rules": [
+    "Every feature MUST have its own entry -- no sprint-level-only tracking",
+    "status may only be set to evaluator_pass when code_evaluator_verdict is PASS",
+    "coverage_pct must be populated when status moves to code_complete or later",
+    "pr_number should be set when a PR is opened for this feature"
   ]
 }

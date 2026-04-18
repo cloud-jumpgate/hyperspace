@@ -1,138 +1,159 @@
-# Sprint Contract — [F-ID]: [Feature Name]
+# Sprint Contract — S[N]: [Sprint Name]
 
-**Version:** 1.0
-**Feature ID:** [F-ID]
-**Sprint:** [S-ID]
-**Project:** [PROJECT_NAME]
+**Version:** 2.0
+**Sprint:** S[N]
+**Project:** Hyperspace
 **Written by:** Engineering Orchestrator
 **Date:** [DATE]
 **Status:** Draft / Signed / Active / Complete / Failed
 
-> **PURPOSE:** This contract defines what "done" means for [F-ID]. It is negotiated before implementation begins and verified independently by the Code Evaluator (and Security Evaluator if applicable). The implementing agent must not modify this document. Any change to acceptance criteria requires a new contract version approved by the Engineering Orchestrator.
+> **PURPOSE:** This contract defines what "done" means for sprint S[N]. It is verified independently by the Code Evaluator (and Security Evaluator if applicable). The implementing agent must not modify this document. Any change to acceptance criteria requires a new contract version approved by the Engineering Orchestrator.
 
 ---
 
-## 1. Feature Description
+## 1. Sprint Description
 
-[One paragraph describing what this feature does, from the user's perspective. Written in plain language.]
+[One paragraph describing the sprint goal and what features it delivers. Written in plain language.]
 
 ---
 
-## 2. Implementing Agent
+## 2. Features in This Sprint
+
+| Feature ID | Feature Name | Implementing Agent | Model |
+|---|---|---|---|
+| F-NNN | [Feature Name] | [agent] | claude-sonnet-4-6 |
+
+---
+
+## 3. Implementing Agent
 
 | Attribute | Value |
 |---|---|
 | Agent | [e.g., backend-engineer] |
 | Model | [e.g., claude-sonnet-4-6] |
 | Context Tier | [e.g., Tier 2] |
-| Sprint | [S-ID] |
-| Must Not Touch | [List of files/components off-limits for this feature] |
+| Sprint | S[N] |
+| Must Not Touch | SYSTEM_ARCHITECTURE.md, SPEC.md, CLAUDE.md, decision_log.md, framework/ |
 
 ---
 
-## 3. Acceptance Criteria (Must Pass)
+## 4. Acceptance Criteria (Must Pass)
 
 All of the following must be true for the Evaluator to return PASS.
 
-### 3.1 Functional Criteria
+### 4.1 Feature F-NNN: [Feature Name]
 
-- [ ] **[Criterion ID]**: [Specific, testable statement of behaviour. Written so that a second agent can independently verify it without ambiguity.]
-- [ ] **[Criterion ID]**: [Specific, testable statement.]
-- [ ] **[Criterion ID]**: [Specific, testable statement.]
+#### Compilation and structure
 
-### 3.2 Non-Functional Criteria
+- [ ] **F-NNN-C01**: [Specific compilation/structure criterion]
 
-- [ ] **Test coverage**: New code must have ≥ 80% line coverage
-- [ ] **No regressions**: All existing tests continue to pass
-- [ ] **Lint**: `make lint` exits 0
-- [ ] **Build**: `make build` exits 0
+#### Functional criteria
 
-### 3.3 Security Criteria (if applicable)
+- [ ] **F-NNN-F01**: [Specific, testable statement of behaviour. Written so that a second agent can independently verify it without ambiguity.]
+- [ ] **F-NNN-F02**: [Specific, testable statement.]
+
+#### Tests
+
+- [ ] **F-NNN-T01**: [Test criterion -- specific test name, what it verifies, expected outcome]
+- [ ] **F-NNN-T02**: [Test criterion]
+
+### 4.2 Non-Functional Criteria (All Features)
+
+- [ ] **NF-01**: `golangci-lint run` exits 0 -- zero lint errors
+- [ ] **NF-02**: `make build` exits 0 -- entire module compiles cleanly
+- [ ] **NF-03**: `go test -race ./...` exits 0 -- no races
+- [ ] **NF-04**: Test coverage >= 85%
+
+### 4.3 Security Criteria (if applicable)
 
 > Applicable if this feature involves authentication, data access, external integrations, or user input.
 
-- [ ] **Input validation**: All user-supplied inputs validated before use
-- [ ] **No secrets in code**: No credentials, keys, or secrets in source files
-- [ ] **Auth enforced**: All new endpoints require appropriate authentication
-- [ ] **Security Evaluator PASS**: Security Evaluator must return PASS before feature is marked passing
+- [ ] **SEC-01**: [Specific security criterion]
+- [ ] **SEC-02**: [Specific security criterion]
 
 ---
 
-## 4. Definition of Done
+## 5. Documentation Deliverables (Mandatory -- not deferrable to a later sprint)
 
-The feature is marked `passing` in `progress.json` ONLY when:
-
-1. All acceptance criteria above are met
-2. Code Evaluator returns PASS
-3. Security Evaluator returns PASS (if applicable)
-4. Engineering Orchestrator approves delivery gate
-5. `progress.json` updated to `passing` by implementing agent
+- [ ] Package-level doc comments for all exported types
+- [ ] `shared_knowledge.md` appended with any non-obvious discoveries
+- [ ] `knowledge_base/` updated if new domain knowledge found
+- [ ] `decision_log.md` updated if any ADR-worthy decisions made
+- [ ] Example code updated if public API changed
 
 ---
 
-## 5. Holdout Scenarios
+## 6. Definition of Done
 
-> These scenarios are stored in `scenarios/[PROJECT_NAME]/[F-ID]/` and are NOT visible to the implementing agent. The Evaluator runs these after implementation.
+The sprint is marked complete and features are set to `code_complete` in `progress.json` ONLY when:
+
+1. All acceptance criteria above are met and verified
+2. All documentation deliverables above are complete
+3. Tests pass with required coverage
+4. Linter exits 0
+5. Code Evaluator returns PASS
+6. `progress.json` updated to `code_complete` by implementing agent (then to `evaluator_pass` after Evaluator PASS)
+
+---
+
+## 7. Holdout Scenarios
+
+> These scenarios are stored in `scenarios/hyperspace/S[N]/` and are NOT visible to the implementing agent. The Evaluator runs these after implementation.
 
 | Scenario ID | Description | Expected Outcome |
 |---|---|---|
-| [F-ID]-S01 | [Scenario name] | [Expected behaviour] |
-| [F-ID]-S02 | [Scenario name] | [Expected behaviour] |
-| [F-ID]-S03 | [Edge/error case] | [Expected behaviour] |
+| S[N]-H01 | [Scenario name] | [Expected behaviour] |
+| S[N]-H02 | [Scenario name] | [Expected behaviour] |
+| S[N]-H03 | [Edge/error case] | [Expected behaviour] |
 
-Minimum satisfaction score to pass: **0.95** (≥ 95% of scenarios must pass)
+Minimum satisfaction score to pass: **0.95** (>= 95% of scenarios must pass)
 
 ---
 
-## 6. Out of Scope
+## 8. Out of Scope
 
-The following are explicitly out of scope for this sprint contract. They must not be implemented as part of this feature (even if the implementing agent thinks they are related):
+The following are explicitly out of scope for this sprint contract. They must not be implemented as part of this sprint (even if the implementing agent thinks they are related):
 
 - [Item 1]
 - [Item 2]
 
 ---
 
-## 7. Evaluator Instructions
+## 9. Evaluator Instructions
 
 **Code Evaluator receives:**
 - This sprint contract
-- The git diff for this feature
-- Test results (`make test` output)
+- The git diff for all changes in the sprint
+- Test results output
 
 **Code Evaluator does NOT receive:**
 - The implementing agent's reasoning or intermediate work
 - Any context beyond the above
 
-**Security Evaluator receives (if applicable):**
-- This sprint contract
-- The git diff for this feature
-- `knowledge_base/SECURITY.md`
-
 **Satisfaction score calculation:**
 ```
 satisfaction_score = passing_scenarios / total_scenarios
 
->= 0.95  → PASS
-0.80–0.94 → CONDITIONAL PASS (log warning to harness_telemetry.jsonl)
-< 0.80   → FAIL (route back to implementing agent with defect list)
+>= 0.95  -> PASS
+0.80-0.94 -> CONDITIONAL PASS (log warning to harness_telemetry.jsonl)
+< 0.80   -> FAIL (route back to implementing agent with defect list)
 ```
 
 ---
 
-## 8. Rework Protocol
+## 10. Rework Protocol
 
 If the Evaluator returns FAIL:
 
 1. Evaluator writes specific defect list in HARNESS_QUALITY_REPORT.md
 2. Engineering Orchestrator routes defect list to implementing agent
 3. Implementing agent addresses defects (session init protocol applies)
-4. Evaluator re-evaluates — full evaluation, not just the defect items
-5. Event logged to harness_telemetry.jsonl: `{"event": "rework", "f_id": "[F-ID]", "reason": "..."}`
+4. Evaluator re-evaluates -- full evaluation, not just the defect items
+5. Event logged to harness_telemetry.jsonl: `{"event": "rework", "sprint": "S[N]", "reason": "..."}`
 
 ---
 
-## 9. Sign-Off
+## 11. Sign-Off
 
 | Role | Agent | Date | Signature |
 |---|---|---|---|

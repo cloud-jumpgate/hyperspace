@@ -1,6 +1,6 @@
 # Hyperspace — Framework Rules
 
-**Version:** 1.0
+**Version:** 2.0
 **Owner:** CTO / Engineering Orchestrator
 **Status:** Mandatory — all agents operating in this repository must comply
 **Effective:** 2026-04-17
@@ -270,3 +270,108 @@ No deliverable passes without clearing all applicable gates:
 | Knowledge base gap | Harness Architect | Note in session_handoff.md |
 | Human decision required | Engineering Orchestrator → User | Surface in session_handoff.md; halt dependent features |
 | quic-go API change / breaking update | Backend Engineer → Harness Architect | Log in decision_log.md; assess impact on F-003, F-004, F-008 |
+| HARD STOP triggered | Engineering Orchestrator | Agent halts immediately; logs event to harness_telemetry.jsonl |
+| Sprint gate fails | Engineering Orchestrator → Harness Team | Fix gap before assigning implementation work |
+
+---
+
+## HARD STOPS (Non-Negotiable Agent Refusals)
+
+**Every agent operating in this repository MUST refuse to proceed if any of the following conditions are true.**
+These are not guidelines. These are blocking conditions. An agent that proceeds despite a HARD STOP is in violation of the framework.
+
+### All Implementing Agents (Backend, DevOps, Security, QA)
+
+1. **No sprint contract exists.** If `sprint_contracts/S[current].md` does not exist for the current sprint, STOP. Do not begin implementation. Escalate to the Engineering Orchestrator.
+
+2. **Harness Evaluator has not issued PASS.** If `HARNESS_QUALITY_REPORT.md` does not exist or contains a FAIL verdict for the prior sprint, STOP. Do not begin implementation. Escalate to the Engineering Orchestrator.
+
+3. **Baseline tests are not green.** If `go test -race ./...` fails, STOP. Diagnose and fix the failure before any new work. Do not implement new features on a broken baseline.
+
+4. **Session state file is missing.** If `session_state.json` does not exist and this is not the first session, STOP. The project state is unknown. Escalate.
+
+5. **Feature marked passing without Evaluator PASS.** Never mark any feature as `evaluator_pass` in `progress.json` without a Code Evaluator PASS verdict. If `progress.json` shows a feature as `evaluator_pass` but `code_evaluator_verdict` is not `PASS`, do not treat it as complete. Report the inconsistency.
+
+6. **Writing sprint-level tracking to progress.json.** The `progress.json` file tracks at FEATURE level. Writing sprint-level-only status (e.g., `"S1": "complete"`) is a schema violation. Every feature must have its own entry.
+
+7. **Session closed without updating artefacts.** Never close a session without updating `session_state.json`, appending to `harness_telemetry.jsonl`, and writing `session_handoff.md`. These three updates are mandatory at every session end.
+
+8. **Calling external services in tests.** Tests must never call AWS services, SPIFFE/SPIRE endpoints, or any external service directly. Use injected interfaces and test doubles. If a test requires an external dependency, use Localstack or equivalent mocks.
+
+9. **Adding CGO outside permitted packages.** CGO is only permitted in `pkg/cc/drl` and `pkg/ipc/memmap`. Adding CGO anywhere else requires an Architecture Evaluator ADR before proceeding.
+
+10. **Sprint contract has no documentation deliverables.** If the sprint contract does not include a "Documentation Deliverables" section, STOP. The contract is incomplete. Escalate to the Harness Architect.
+
+### Engineering Orchestrator (Additional)
+
+11. **Do not assign implementation work without a signed sprint contract.** The sprint contract must exist in `sprint_contracts/` with a completed sign-off section before any implementing agent receives a task.
+
+12. **Invoke the Harness Evaluator at every sprint boundary.** At the end of every sprint, before starting the next, the Harness Evaluator must produce or update `HARNESS_QUALITY_REPORT.md`. This is not optional. This is every sprint.
+
+13. **Do not deliver to the user without Code Evaluator PASS.** The Code Evaluator must independently verify the implementation before the Engineering Orchestrator approves delivery.
+
+14. **Do not skip the Business Requirements stage for new projects.** Every new project must have a validated `requirements.md` (or equivalent approved brief from CTO) before the Harness Architect begins.
+
+---
+
+## PRE-SPRINT GATE (Must Be Verified Before Any Sprint Begins)
+
+Before the Engineering Orchestrator assigns any implementation work for sprint S[N], the following must all be true:
+
+### Mandatory Pre-Sprint Checklist
+
+- [ ] **Sprint contract exists:** `sprint_contracts/S[N].md` is present, non-empty, and follows the template
+- [ ] **Documentation deliverables listed:** The sprint contract includes a "Documentation Deliverables" section with at least one deliverable
+- [ ] **HARNESS_QUALITY_REPORT.md is current:** The report was updated within the last sprint cycle and contains PASS or CONDITIONAL PASS
+- [ ] **progress.json is feature-level:** Every feature has an entry with `status`, `code_evaluator_verdict`, and `coverage_pct` fields
+- [ ] **Previous sprint evaluated:** The Code Evaluator has issued a verdict for every feature in the previous sprint that was marked `in_progress` or `code_complete`
+- [ ] **Baseline tests green:** `go test -race ./...` exits 0 on the current branch
+- [ ] **Session artefacts current:** `session_state.json` and `session_handoff.md` were updated at the end of the previous sprint
+- [ ] **Telemetry event logged:** `harness_telemetry.jsonl` has a `sprint_start` event for S[N]
+
+### If Any Item Fails
+
+The Engineering Orchestrator MUST NOT assign implementation work. Instead:
+1. Invoke the Harness Evaluator to assess the gap
+2. Invoke the relevant harness team member to fix the gap
+3. Re-verify the checklist
+4. Only proceed when all items are checked
+
+---
+
+## ENFORCEMENT CHECKLIST (Machine-Checkable Items)
+
+These items can be verified by `init.sh` or the CI `harness-check` job. They are the automated enforcement layer.
+
+### Per-Session (verified by init.sh)
+
+| Check | Command / File | Pass Condition |
+|---|---|---|
+| Sprint contract exists | `test -s sprint_contracts/S${SPRINT}.md` | File exists and is non-empty |
+| Harness verdict is PASS | `grep -q "PASS" HARNESS_QUALITY_REPORT.md` | File contains PASS or CONDITIONAL PASS |
+| Baseline tests green | `go test -race ./...` | Exit code 0 |
+| Session state exists | `test -f session_state.json` | File exists |
+| progress.json has features | `jq '.features | length' progress.json` | Count > 0 (not sprint-level tracking) |
+| Telemetry has sprint_start | `grep "sprint_start" harness_telemetry.jsonl` | Event present for current sprint |
+
+### Per-PR (verified by CI harness-check job)
+
+| Check | Verification | Pass Condition |
+|---|---|---|
+| HARNESS_QUALITY_REPORT.md exists | File existence check | File present in repo |
+| HARNESS_QUALITY_REPORT.md recent | File modification date | Updated within last 14 days |
+| progress.json feature-level | JSON schema check | Contains `features` array, not `sprints` array |
+| session_state.json updated | File modification date | Updated within last 7 days |
+| Sprint contracts non-empty | File size check | All S*.md files > 100 bytes |
+| Knowledge base populated | File size check | All knowledge_base/*.md files > 1024 bytes |
+| Evaluator verdict present | Content check | At least one feature has code_evaluator_verdict != null |
+
+### Per-Sprint-Boundary (verified by Engineering Orchestrator)
+
+| Check | Mechanism | Pass Condition |
+|---|---|---|
+| Harness Evaluator invoked | HARNESS_QUALITY_REPORT.md timestamp | Updated since last sprint ended |
+| Sprint contract for next sprint | File existence | sprint_contracts/S[N+1].md exists |
+| Documentation deliverables listed | Content check | Sprint contract has Documentation Deliverables section |
+| Previous sprint features evaluated | progress.json | All code_complete features have code_evaluator_verdict |
+| Telemetry event logged | harness_telemetry.jsonl | sprint_end event present for S[N] |

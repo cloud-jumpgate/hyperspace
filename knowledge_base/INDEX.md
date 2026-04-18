@@ -1,10 +1,10 @@
-# Knowledge Base Index — [PROJECT_NAME]
+# Knowledge Base Index — Hyperspace
 
-**Status:** Empty — seed when project activates
+**Status:** Active
 **Owner:** Harness Architect
-**Last Updated:** [DATE]
+**Last Updated:** 2026-04-17
 
-> This index is the master reference for all domain knowledge relevant to this project. It is updated by the Harness Architect whenever an agent discovers new knowledge worth preserving. Agents reference this index to find relevant resources before beginning implementation tasks.
+> This index is the master reference for all domain knowledge relevant to the Hyperspace project. It is updated by the Harness Architect whenever an agent discovers new knowledge worth preserving. Agents reference this index to find relevant resources before beginning implementation tasks.
 
 ---
 
@@ -21,41 +21,24 @@
 
 | Category | File | Description | Status |
 |---|---|---|---|
-| Domain Knowledge | `DOMAIN_KNOWLEDGE.md` | Project-specific business domain concepts | Empty — seed on activation |
-| Security | `SECURITY.md` | Security references, checklists, patterns | Empty — seed on activation |
-| Architecture Patterns | `ARCHITECTURE_PATTERNS.md` | Patterns relevant to this project's tech stack | Empty — seed on activation |
-| External Resources | `EXTERNAL_RESOURCES.md` | Links to papers, standards, docs, APIs | Empty — seed on activation |
+| Domain Knowledge | `DOMAIN_KNOWLEDGE.md` | Hyperspace-specific: QUIC multi-connection transport, log buffer architecture, Aeron-inspired IPC, DRL congestion control, channel URI format | Active |
+| Security | `SECURITY.md` | SPIFFE/SPIRE workload identity, mTLS enforcement, TLS 1.3 minimum, Go security patterns (gosec, govulncheck), mmap file permissions, frame length validation | Active |
+| Architecture Patterns | `ARCHITECTURE_PATTERNS.md` | Aeron DNA (media driver pattern), pub/sub with shared-memory log buffers, zero-copy IPC via mmap, Multi-QUIC connection pooling, embedded driver mode for testing | Active |
+| External Resources | `EXTERNAL_RESOURCES.md` | quic-go docs (github.com/quic-go/quic-go), go-spiffe library (github.com/spiffe/go-spiffe/v2), ONNX Runtime Go binding (github.com/yalue/onnxruntime_go), SPIFFE specification, RFC 8312 (CUBIC), BBRv3 Google proposal | Active |
 
 ---
 
-## Seeding Instructions
+## Key Domain Concepts (Quick Reference)
 
-When this project activates, the Harness Architect seeds each knowledge base file with:
-
-### DOMAIN_KNOWLEDGE.md
-- Business domain terminology specific to this project
-- Key entities and their relationships (in plain language)
-- Domain constraints and invariants
-- Links to any domain specification documents
-
-### SECURITY.md
-- Language-specific security checklist (Go / Python / TypeScript)
-- OWASP references relevant to this project's risk surface
-- Authentication/authorisation pattern documentation
-- Known vulnerable patterns to avoid
-- Dependency vulnerability scanning instructions
-
-### ARCHITECTURE_PATTERNS.md
-- Design patterns used in this project with rationale
-- Anti-patterns explicitly rejected (and why)
-- Links to reference implementations
-- Technology-specific best practices
-
-### EXTERNAL_RESOURCES.md
-- Links to all external APIs this project integrates with
-- Relevant RFC / standards documents
-- Research papers that informed architectural decisions
-- Case studies from similar systems
+- **Log Buffer**: Three-term mmap'd ring buffer for zero-syscall IPC between client and driver
+- **Driver Daemon (hsd)**: Out-of-process agent running Conductor, Sender, Receiver, PathManager, PoolManager
+- **Multi-QUIC Pool**: N concurrent QUIC connections per peer for ECMP path diversity
+- **Arbitrator**: Strategy-based connection selection (LowestRTT, LeastOutstanding, Hybrid, Sticky, Random)
+- **Path Manager**: PING/PONG probe loop measuring per-connection RTT, loss, throughput
+- **Adaptive Pool Learner**: Latency-loss correlation model for automatic pool sizing
+- **Channel URI**: `hs:quic?endpoint=host:port|pool=N|cc=algo`
+- **CNC file (cnc.dat)**: Shared counter array for observability; read by hyperspace-stat CLI
+- **SVID**: SPIFFE Verifiable Identity Document -- short-lived X.509 cert from SPIRE Agent
 
 ---
 
