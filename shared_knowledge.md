@@ -300,3 +300,25 @@ Receiver image entries now carry a `lastAccess` timestamp. Every 1000 `DoWork` c
 
 ### C-02: Composite Session Key
 Receiver image map changed from `map[int32]*imageEntry` (keyed by sessionID alone) to `map[uint64]*imageEntry` using `compositeKey(sessionID, streamID) = uint64(uint32(sessionID))<<32 | uint64(uint32(streamID))`. This eliminates birthday collisions when multiple streams share the same sessionID. `RemoveImage` now takes both `(sessionID, streamID int32)` parameters.
+
+---
+
+## 2026-04-18 -- CTO -- Sprint S13: Operability + Scale Patterns
+
+### F-01: Transport Connection Interface
+`quictr.Dial` and `quictr.Accept` now return `quictr.Connection` (the interface) instead of `*quictr.QUICConnection` (the concrete type). All consumers already referenced the interface. Tests that need quic-go-specific methods (e.g., `ConnectionState()`) use type assertion: `conn.(*quictr.QUICConnection)`.
+
+### F-02: Config Externalisation
+`sender.New` accepts `SenderOption` functional options. `WithFragmentsPerBatch(n)` overrides the default (32). `conductor.DefaultMaxCommandsPerCycle` (10) and `conductor.DefaultBroadcastMaxPayload` (512) are now exported constants; `maxCmdsPerCycle` is a field on `Conductor`. This pattern allows runtime configuration without breaking existing callers.
+
+### P-03: Lock-Free Conductor Reads
+`Conductor.Publications()` and `Subscriptions()` now return `*syncatomic.Pointer[[]*PublicationState]` snapshots. Writes (add/remove) rebuild the snapshot under `mu` and atomically publish via `Store()`. Reads use `Load()` with zero mutex contention. The mutex remains for write serialisation only -- reads on the sender/receiver hot path are lock-free.
+
+### C-08: Sticky Arbitrator Pin Cleanup
+`StickyArbitrator` (renamed from unexported `sticky`) exposes `Remove(publicationID int64)` and `PinCount() int`. `Remove` deletes the pin entry, preventing unbounded growth when publications are frequently added and removed. Wire to `handleRemovePublication` in conductor for automatic cleanup.
+
+### A-04: Broadcast Lapping Reconciliation
+After `pollBroadcast` detects `ErrLapped`, `reconcileAfterLap()` re-queries the conductor's publication and subscription state. For each pending correlationID found in conductor state, it synthesises the missed response (`RspPublicationReady` or `RspSubscriptionReady`) and delivers it to the waiting request channel.
+
+### A-05: Adaptive pollBroadcast Backoff
+`pollBroadcast` starts sleeping at 100us and increases to 1ms after 10 consecutive idle cycles. Any received message resets the backoff to 100us. This reduces CPU usage during idle periods while maintaining low latency when messages are flowing.

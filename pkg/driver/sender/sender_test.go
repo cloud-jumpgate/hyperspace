@@ -500,3 +500,41 @@ func TestDoWork_UsesArbitrator(t *testing.T) {
 		t.Error("expected arbitrator Pick to be called at least once")
 	}
 }
+
+// --- F-025: Config Externalisation ---
+
+func TestNew_DefaultFragmentsPerBatch(t *testing.T) {
+	cond, _ := newTestConductorAndRing(t)
+	s := sender.New(cond, arbitrator.NewRandom(nil), 1200)
+	if s == nil {
+		t.Fatal("expected non-nil sender with default fragmentsPerBatch")
+	}
+}
+
+func TestNew_WithFragmentsPerBatch(t *testing.T) {
+	cond, ring := newTestConductorAndRing(t)
+
+	mc := newMockConn(1)
+	p := pool.New("peer1", 1, 4)
+	if err := p.Add(mc); err != nil {
+		t.Fatalf("pool.Add: %v", err)
+	}
+
+	// Set fragmentsPerBatch to 1: should send at most 1 frame per DoWork.
+	s := sender.New(cond, arbitrator.NewRandom(nil), 1200, sender.WithFragmentsPerBatch(1))
+	s.AddPool("peer1", p)
+
+	writeAddPublication(t, ring, 1, 100)
+	cond.DoWork(context.Background())
+
+	pubs := cond.Publications()
+	appendToPublication(t, pubs[0], []byte("msg-1"))
+	appendToPublication(t, pubs[0], []byte("msg-2"))
+	appendToPublication(t, pubs[0], []byte("msg-3"))
+
+	// First DoWork should send exactly 1 frame (fragmentsPerBatch=1).
+	n := s.DoWork(context.Background())
+	if n != 1 {
+		t.Fatalf("expected 1 frame (fragmentsPerBatch=1), got %d", n)
+	}
+}

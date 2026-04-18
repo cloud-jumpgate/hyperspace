@@ -15,8 +15,8 @@ import (
 	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 )
 
-// fragmentsPerBatch is the maximum frames read from a log buffer per DoWork call.
-const fragmentsPerBatch = 32
+// DefaultFragmentsPerBatch is the default maximum frames read from a log buffer per DoWork call.
+const DefaultFragmentsPerBatch = 32
 
 // sendPosition tracks the sender's read position within a publication's log buffer.
 // S-03 fix: track (partitionIndex, termOffset) together so that position resets
@@ -28,10 +28,11 @@ type sendPosition struct {
 
 // Sender is the outbound data plane agent.
 type Sender struct {
-	conductor *conductor.Conductor
-	pools     map[string]*pool.Pool // peer -> pool
-	arb       arbitrator.Arbitrator
-	mtu       int // max payload per QUIC write (default 1200)
+	conductor         *conductor.Conductor
+	pools             map[string]*pool.Pool // peer -> pool
+	arb               arbitrator.Arbitrator
+	mtu               int // max payload per QUIC write (default 1200)
+	fragmentsPerBatch int // max frames per DoWork call (F-02 fix: configurable)
 	// per-publication send position tracking (S-03 fix: term-aware)
 	positions map[int64]*sendPosition // publicationID -> (partitionIndex, termOffset)
 	// framePool provides reusable byte buffers for frame serialization (P-01 fix).
@@ -39,23 +40,41 @@ type Sender struct {
 }
 
 // New creates a Sender.
-func New(cond *conductor.Conductor, arb arbitrator.Arbitrator, mtu int) *Sender {
+// fragmentsPerBatch: max frames per DoWork call (0 = DefaultFragmentsPerBatch).
+func New(cond *conductor.Conductor, arb arbitrator.Arbitrator, mtu int, opts ...SenderOption) *Sender {
 	if mtu <= 0 {
 		mtu = 1200
 	}
 	maxFrameSize := mtu + logbuffer.HeaderLength
-	return &Sender{
-		conductor: cond,
-		pools:     make(map[string]*pool.Pool),
-		arb:       arb,
-		mtu:       mtu,
-		positions: make(map[int64]*sendPosition),
+	s := &Sender{
+		conductor:         cond,
+		pools:             make(map[string]*pool.Pool),
+		arb:               arb,
+		mtu:               mtu,
+		fragmentsPerBatch: DefaultFragmentsPerBatch,
+		positions:         make(map[int64]*sendPosition),
 		framePool: sync.Pool{
 			New: func() any {
 				buf := make([]byte, maxFrameSize)
 				return &buf
 			},
 		},
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// SenderOption configures a Sender.
+type SenderOption func(*Sender)
+
+// WithFragmentsPerBatch sets the maximum frames read from a log buffer per DoWork call.
+func WithFragmentsPerBatch(n int) SenderOption {
+	return func(s *Sender) {
+		if n > 0 {
+			s.fragmentsPerBatch = n
+		}
 	}
 }
 
@@ -166,7 +185,7 @@ func (s *Sender) sendPublication(_ context.Context, pub *conductor.PublicationSt
 		// Return buffer to pool after successful send.
 		s.framePool.Put(bufPtr)
 		totalSent++
-	}, termOffset, fragmentsPerBatch)
+	}, termOffset, s.fragmentsPerBatch)
 
 	// Advance tracked position to where the reader left off.
 	pos.termOffset = nextOffset

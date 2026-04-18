@@ -256,6 +256,72 @@
       "coverage_pct": 92,
       "pr_number": 10,
       "notes": "Fix: use composite key (sessionID, streamID) as uint64 for image map instead of sessionID alone."
+    },
+    {
+      "id": "F-024",
+      "name": "Transport Connection Interface (F-01)",
+      "sprint": "S13",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Define transport.Connection interface. All consumers reference interface, not concrete quictr type."
+    },
+    {
+      "id": "F-025",
+      "name": "Config Externalisation (F-02)",
+      "sprint": "S13",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Surface hardcoded constants as configurable parameters with defaults matching current values."
+    },
+    {
+      "id": "F-026",
+      "name": "Broadcast Lapping Reconciliation (A-04)",
+      "sprint": "S13",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "After ErrLapped, re-query conductor state to detect missed publication/subscription responses."
+    },
+    {
+      "id": "F-027",
+      "name": "Lock-Free Conductor Reads (P-03)",
+      "sprint": "S13",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Replace mutex-guarded Publications()/Subscriptions() with atomic.Pointer for lock-free reads."
+    },
+    {
+      "id": "F-028",
+      "name": "Sticky Arbitrator Pin Cleanup (C-08)",
+      "sprint": "S13",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Add Remove(publicationID) to sticky arbitrator to prevent unbounded pin map growth."
+    },
+    {
+      "id": "F-029",
+      "name": "Adaptive pollBroadcast Backoff (A-05)",
+      "sprint": "S13",
+      "status": "in_progress",
+      "code_evaluator_verdict": null,
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Replace fixed 100us sleep with adaptive backoff (100us to 1ms) based on idle cycle count."
     }
   ],
   "_status_values": [

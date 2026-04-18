@@ -126,7 +126,8 @@ func TestConnectionState_ReturnsHyperspaceALPN(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 
-	state := conn.ConnectionState()
+	qc := conn.(*quictr.QUICConnection)
+	state := qc.ConnectionState()
 	assert.Equal(t, "hyperspace/1", state.TLS.NegotiatedProtocol,
 		"valid connection should negotiate hyperspace/1")
 }
@@ -408,7 +409,7 @@ func TestStats(t *testing.T) {
 func TestAccept(t *testing.T) {
 	ln := startTestServer(t)
 
-	connCh := make(chan *quictr.QUICConnection, 1)
+	connCh := make(chan quictr.Connection, 1)
 	go func() {
 		conn, err := ln.Accept(context.Background())
 		if err == nil {
@@ -532,7 +533,8 @@ func TestDial_EnforcesALPN(t *testing.T) {
 	require.NoError(t, err, "Dial should succeed and inject ALPN")
 	defer func() { _ = conn.Close() }()
 
-	state := conn.ConnectionState()
+	qc := conn.(*quictr.QUICConnection)
+	state := qc.ConnectionState()
 	assert.Equal(t, "hyperspace/1", state.TLS.NegotiatedProtocol,
 		"Dial should inject hyperspace/1 ALPN when not present in config")
 }

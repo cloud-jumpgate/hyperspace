@@ -632,3 +632,87 @@ func TestBroadcastError_TriggeredOnInvalidTermLength(t *testing.T) {
 	_ = ring
 	_ = rx
 }
+
+// --- P-03: Lock-Free Conductor Reads ---
+
+func TestPublications_LockFreeAfterAdd(t *testing.T) {
+	cond, ring, _ := newTestConductor(t)
+
+	// Initially empty.
+	pubs := cond.Publications()
+	if len(pubs) != 0 {
+		t.Fatalf("expected 0 publications initially, got %d", len(pubs))
+	}
+
+	// Add a publication via the ring buffer.
+	writeAddPublication(t, ring, 1, 100, "")
+	cond.DoWork(context.Background())
+
+	// Publications should now have 1 entry (lock-free read).
+	pubs = cond.Publications()
+	if len(pubs) != 1 {
+		t.Fatalf("expected 1 publication, got %d", len(pubs))
+	}
+}
+
+func TestSubscriptions_LockFreeAfterAdd(t *testing.T) {
+	cond, ring, _ := newTestConductor(t)
+
+	// Initially empty.
+	subs := cond.Subscriptions()
+	if len(subs) != 0 {
+		t.Fatalf("expected 0 subscriptions initially, got %d", len(subs))
+	}
+
+	// Add a subscription via the ring buffer.
+	writeAddSubscription(t, ring, 1, 200, "")
+	cond.DoWork(context.Background())
+
+	// Subscriptions should now have 1 entry.
+	subs = cond.Subscriptions()
+	if len(subs) != 1 {
+		t.Fatalf("expected 1 subscription, got %d", len(subs))
+	}
+}
+
+func TestPublications_EmptyAfterRemove(t *testing.T) {
+	cond, ring, _ := newTestConductor(t)
+
+	writeAddPublication(t, ring, 1, 100, "")
+	cond.DoWork(context.Background())
+
+	if len(cond.Publications()) != 1 {
+		t.Fatal("expected 1 publication after add")
+	}
+
+	// Remove the publication.
+	writeRemovePublication(t, ring, 1)
+	cond.DoWork(context.Background())
+
+	pubs := cond.Publications()
+	if len(pubs) != 0 {
+		t.Fatalf("expected 0 publications after remove, got %d", len(pubs))
+	}
+}
+
+func TestPublications_ConcurrentRead(t *testing.T) {
+	cond, ring, _ := newTestConductor(t)
+
+	writeAddPublication(t, ring, 1, 100, "")
+	cond.DoWork(context.Background())
+
+	// Read publications concurrently from multiple goroutines.
+	done := make(chan struct{})
+	for range 10 {
+		go func() {
+			for range 100 {
+				pubs := cond.Publications()
+				_ = pubs
+			}
+			done <- struct{}{}
+		}()
+	}
+	for range 10 {
+		<-done
+	}
+}

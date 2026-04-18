@@ -158,8 +158,9 @@ func (h *hybrid) Pick(candidates []quictr.Connection, _ int64, _ int) (quictr.Co
 
 // --- Sticky ------------------------------------------------------------------
 
-// sticky pins each publicationID to one connection unless RTT degrades past threshold.
-type sticky struct {
+// StickyArbitrator pins each publicationID to one connection unless RTT degrades past threshold.
+// C-08 fix: exposes Remove(publicationID) to clean up pins when publications are removed.
+type StickyArbitrator struct {
 	mu               sync.Mutex
 	pins             map[int64]uint64 // publicationID → connection ID
 	degradeThreshold float64          // e.g. 0.5 = 50% worse than pool best
@@ -168,14 +169,29 @@ type sticky struct {
 // NewSticky creates an arbitrator that pins each publicationID to one connection
 // unless that connection's RTT degrades more than degradeThreshold (e.g. 0.5 = 50%
 // worse than pool best). On degrade, re-pins to the current best.
-func NewSticky(degradeThreshold float64) Arbitrator {
-	return &sticky{
+func NewSticky(degradeThreshold float64) *StickyArbitrator {
+	return &StickyArbitrator{
 		pins:             make(map[int64]uint64),
 		degradeThreshold: degradeThreshold,
 	}
 }
 
-func (*sticky) Name() string { return "sticky" }
+func (*StickyArbitrator) Name() string { return "sticky" }
+
+// Remove deletes the pin for the given publicationID.
+// C-08 fix: prevents the pins map from growing unbounded when publications are removed.
+func (s *StickyArbitrator) Remove(publicationID int64) {
+	s.mu.Lock()
+	delete(s.pins, publicationID)
+	s.mu.Unlock()
+}
+
+// PinCount returns the number of active pins (for testing).
+func (s *StickyArbitrator) PinCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.pins)
+}
 
 // bestByRTT finds the connection with the lowest RTT and returns (conn, bestRTT).
 func bestByRTT(candidates []quictr.Connection) (quictr.Connection, time.Duration) {
@@ -188,7 +204,7 @@ func bestByRTT(candidates []quictr.Connection) (quictr.Connection, time.Duration
 	return best, best.RTT()
 }
 
-func (s *sticky) Pick(candidates []quictr.Connection, publicationID int64, _ int) (quictr.Connection, error) {
+func (s *StickyArbitrator) Pick(candidates []quictr.Connection, publicationID int64, _ int) (quictr.Connection, error) {
 	if len(candidates) == 0 {
 		return nil, ErrNoConnections
 	}
