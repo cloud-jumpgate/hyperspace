@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cloud-jumpgate/hyperspace/pkg/cc"
-	"github.com/cloud-jumpgate/hyperspace/pkg/cc/cubic"
+	"github.com/cloud-jumpgate/hyperspace/pkg/cc/bbrv3"
 )
 
 const (
@@ -77,8 +77,8 @@ type DRLController struct {
 
 	policy Policy
 
-	// Embedded CUBIC for fallback.
-	fallback *cubicWrapper
+	// ADR-007: BBRv3 fallback when inference fails or times out.
+	fallback cc.CongestionControl
 
 	cwnd int
 
@@ -104,12 +104,6 @@ type DRLController struct {
 	baseBW  float64
 }
 
-// cubicWrapper wraps cubic.CubicCC to expose it as a cc.CongestionControl
-// and access its window for fallback decisions.
-type cubicWrapper struct {
-	cc.CongestionControl
-}
-
 // NewWithPolicy creates a DRLController with the given policy.
 func NewWithPolicy(initialCwnd int, minRTT time.Duration, policy Policy) cc.CongestionControl {
 	if minRTT <= 0 {
@@ -129,7 +123,9 @@ func NewWithPolicy(initialCwnd int, minRTT time.Duration, policy Policy) cc.Cong
 	if d.cwnd < cwndMin {
 		d.cwnd = cwndMin
 	}
-	d.fallback = &cubicWrapper{cubic.New(initialCwnd, minRTT)}
+	// ADR-007: use BBRv3 as fallback, not CUBIC. BBRv3 shares the bandwidth-probing
+	// philosophy with DRL, producing more consistent behaviour during fallback.
+	d.fallback = bbrv3.New(initialCwnd, minRTT)
 	return d
 }
 

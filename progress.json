@@ -322,6 +322,72 @@
       "coverage_pct": 91,
       "pr_number": 11,
       "notes": "Adaptive backoff 100us to 1ms after 10 idle cycles. Resets on message receipt."
+    },
+    {
+      "id": "F-030",
+      "name": "DRL Fallback to BBRv3",
+      "sprint": "S14",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": null,
+      "coverage_pct": 85,
+      "pr_number": null,
+      "notes": "ADR-007: DRL fallback changed from CUBIC to BBRv3. TestFallbackIsBBRv3 verifies."
+    },
+    {
+      "id": "F-031",
+      "name": "SVID Continuous Rotation",
+      "sprint": "S14",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": "PASS",
+      "coverage_pct": 85,
+      "pr_number": null,
+      "notes": "ADR-008: SPIFFESource.StartWatch() with atomic TLS config rotation. 5 new tests."
+    },
+    {
+      "id": "F-032",
+      "name": "Send Retry with Back-Pressure Propagation",
+      "sprint": "S14",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": null,
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "ADR-009: 3-attempt retry with connection removal, LostFrames counter, back-pressure flag. 4 new tests."
+    },
+    {
+      "id": "F-033",
+      "name": "Inbound TLS and SPIFFE ID Validation",
+      "sprint": "S14",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": "PASS",
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "ADR-010: Accept() validates HandshakeComplete, PeerCertificates, optional SPIFFE URI SAN. 4 new tests."
+    },
+    {
+      "id": "F-034",
+      "name": "TLS MinVersion=0 Rejection",
+      "sprint": "S14",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": "PASS",
+      "coverage_pct": 90,
+      "pr_number": null,
+      "notes": "ADR-012: validateTLSConfig panics on MinVersion==0 to prevent TLS 1.2 downgrade. 1 new test."
+    },
+    {
+      "id": "F-035",
+      "name": "SPEC Frame Header Update to 32 Bytes",
+      "sprint": "S14",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": null,
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "ADR-011: SPEC.md F-001 updated to 32-byte canonical layout with all 8 fields. Documentation-only."
     }
   ],
   "_status_values": [

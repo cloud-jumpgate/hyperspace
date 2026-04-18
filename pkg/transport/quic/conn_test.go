@@ -78,16 +78,28 @@ func TestDial_NilTLSRejected(t *testing.T) {
 // MinVersion below TLS 1.3.
 func TestDial_EnforcesMinTLS13(t *testing.T) {
 	tests := []struct {
-		name    string
-		minVer  uint16
-		wantErr bool
+		name      string
+		minVer    uint16
+		wantErr   bool
+		wantPanic bool
 	}{
-		{"tls12 explicit", tls.VersionTLS12, true},
-		{"tls13 explicit", tls.VersionTLS13, false}, // ok
-		{"zero (unset)", 0, false},                  // ok — Dial will set TLS 1.3
+		{"tls12 explicit", tls.VersionTLS12, true, false},
+		{"tls13 explicit", tls.VersionTLS13, false, false},
+		{"zero (unset)", 0, false, true}, // ADR-012: zero MinVersion must panic
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.wantPanic {
+				assert.Panics(t, func() {
+					conf := &tls.Config{
+						InsecureSkipVerify: true, //nolint:gosec // test-only
+						NextProtos:         []string{"hyperspace/1"},
+						MinVersion:         tc.minVer,
+					}
+					_, _ = quictr.Dial(context.Background(), "127.0.0.1:1", conf, "bbr")
+				}, "MinVersion=0 should panic per ADR-012")
+				return
+			}
 			if !tc.wantErr {
 				// For valid configs, actually connect.
 				ln := startTestServer(t)
@@ -143,7 +155,7 @@ func TestSendControl_RecvControl(t *testing.T) {
 		if err != nil {
 			return
 		}
-		serverQC := quictr.Accept(conn)
+		serverQC, _ := quictr.Accept(conn)
 		defer func() { _ = serverQC.Close() }()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -215,7 +227,7 @@ func TestSendProbe_RecvProbe(t *testing.T) {
 		if err != nil {
 			return
 		}
-		serverQC := quictr.Accept(conn)
+		serverQC, _ := quictr.Accept(conn)
 		defer func() { _ = serverQC.Close() }()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -284,7 +296,7 @@ func TestSend_RecvData(t *testing.T) {
 		if err != nil {
 			return
 		}
-		serverQC := quictr.Accept(conn)
+		serverQC, _ := quictr.Accept(conn)
 		defer func() { _ = serverQC.Close() }()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -413,7 +425,10 @@ func TestAccept(t *testing.T) {
 	go func() {
 		conn, err := ln.Accept(context.Background())
 		if err == nil {
-			connCh <- quictr.Accept(conn)
+			sc, acceptErr := quictr.Accept(conn)
+			if acceptErr == nil {
+				connCh <- sc
+			}
 		}
 	}()
 
@@ -573,7 +588,7 @@ func TestSend_MultipleStreamIDs(t *testing.T) {
 		if err != nil {
 			return
 		}
-		serverQC := quictr.Accept(conn)
+		serverQC, _ := quictr.Accept(conn)
 		defer func() { _ = serverQC.Close() }()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -617,4 +632,183 @@ func TestSend_MultipleStreamIDs(t *testing.T) {
 		}
 	}
 	assert.Len(t, received, 2)
+}
+
+// --- F-033: Inbound TLS and SPIFFE ID Validation ---
+
+// TestAccept_ValidConnection verifies Accept succeeds with a valid mTLS connection.
+func TestAccept_ValidConnection(t *testing.T) {
+	ln := startTestServer(t)
+
+	acceptResult := make(chan error, 1)
+	go func() {
+		conn, err := ln.Accept(context.Background())
+		if err != nil {
+			acceptResult <- err
+			return
+		}
+		sc, acceptErr := quictr.Accept(conn)
+		if acceptErr == nil {
+			_ = sc.Close()
+		}
+		acceptResult <- acceptErr
+	}()
+
+	addr := ln.Addr().String()
+	client, err := quictr.Dial(context.Background(), addr, clientTLSConfig(), "bbr")
+	require.NoError(t, err)
+	defer func() { _ = client.Close() }()
+
+	select {
+	case err := <-acceptResult:
+		assert.NoError(t, err, "Accept should succeed with valid mTLS connection")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for Accept result")
+	}
+}
+
+// startNoMTLSServer starts a QUIC server that does NOT request client certificates.
+func startNoMTLSServer(t *testing.T) *quic.Listener {
+	t.Helper()
+	cert := generateTestCert(t)
+	tlsConf := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		NextProtos:   []string{"hyperspace/1"},
+		MinVersion:   tls.VersionTLS13,
+		// No ClientAuth — server does NOT request client cert.
+	}
+
+	udpConn, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	ln, err := quic.Listen(udpConn, tlsConf, &quic.Config{
+		MaxIncomingStreams:    4096,
+		MaxIncomingUniStreams: 4096,
+		KeepAlivePeriod:       5 * time.Second,
+		Allow0RTT:             true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+	return ln
+}
+
+// TestAccept_NoPeerCerts_Rejected verifies Accept rejects connections without
+// peer certificates (no mTLS). This tests the server side — Accept() checks
+// that PeerCertificates is non-empty.
+func TestAccept_NoPeerCerts_Rejected(t *testing.T) {
+	// Use a server that does NOT require client certs — so PeerCertificates is empty.
+	ln := startNoMTLSServer(t)
+
+	acceptResult := make(chan error, 1)
+	go func() {
+		conn, err := ln.Accept(context.Background())
+		if err != nil {
+			acceptResult <- err
+			return
+		}
+		sc, acceptErr := quictr.Accept(conn)
+		if acceptErr == nil {
+			_ = sc.Close()
+		}
+		acceptResult <- acceptErr
+	}()
+
+	addr := ln.Addr().String()
+	client, err := quictr.Dial(context.Background(), addr, clientTLSConfig(), "bbr")
+	require.NoError(t, err)
+	defer func() { _ = client.Close() }()
+
+	select {
+	case err := <-acceptResult:
+		assert.ErrorIs(t, err, quictr.ErrNoPeerCertificates,
+			"Accept should reject connections without peer certificates")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for Accept result")
+	}
+}
+
+// TestAccept_RequireSPIFFE_NoSPIFFECert_Rejected verifies Accept rejects connections
+// when RequireSPIFFE is true but the peer cert has no SPIFFE URI SAN.
+func TestAccept_RequireSPIFFE_NoSPIFFECert_Rejected(t *testing.T) {
+	ln := startTestServer(t)
+
+	acceptResult := make(chan error, 1)
+	go func() {
+		conn, err := ln.Accept(context.Background())
+		if err != nil {
+			acceptResult <- err
+			return
+		}
+		// Require SPIFFE — test certs don't have SPIFFE URIs, so this should fail.
+		sc, acceptErr := quictr.Accept(conn, quictr.AcceptConfig{RequireSPIFFE: true})
+		if acceptErr == nil {
+			_ = sc.Close()
+		}
+		acceptResult <- acceptErr
+	}()
+
+	addr := ln.Addr().String()
+	client, err := quictr.Dial(context.Background(), addr, clientTLSConfig(), "bbr")
+	require.NoError(t, err)
+	defer func() { _ = client.Close() }()
+
+	select {
+	case err := <-acceptResult:
+		assert.ErrorIs(t, err, quictr.ErrNoSPIFFEID,
+			"Accept with RequireSPIFFE should reject cert without SPIFFE URI SAN")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for Accept result")
+	}
+}
+
+// TestAccept_HandshakeComplete verifies that Accept checks HandshakeComplete.
+// With quic-go, handshake is always complete by the time Accept returns,
+// so this test verifies the positive path.
+func TestAccept_HandshakeComplete(t *testing.T) {
+	ln := startTestServer(t)
+
+	connCh := make(chan quictr.Connection, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		conn, err := ln.Accept(context.Background())
+		if err != nil {
+			errCh <- err
+			return
+		}
+		sc, acceptErr := quictr.Accept(conn)
+		if acceptErr != nil {
+			errCh <- acceptErr
+			return
+		}
+		connCh <- sc
+	}()
+
+	addr := ln.Addr().String()
+	client, err := quictr.Dial(context.Background(), addr, clientTLSConfig(), "bbr")
+	require.NoError(t, err)
+	defer func() { _ = client.Close() }()
+
+	select {
+	case sc := <-connCh:
+		assert.NotNil(t, sc, "accepted connection should not be nil")
+		_ = sc.Close()
+	case err := <-errCh:
+		t.Fatalf("Accept failed unexpectedly: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out")
+	}
+}
+
+// --- F-034: TLS MinVersion=0 Rejection ---
+
+// TestValidateTLSConfig_ZeroMinVersion_Panics verifies that MinVersion=0 panics.
+func TestValidateTLSConfig_ZeroMinVersion_Panics(t *testing.T) {
+	assert.Panics(t, func() {
+		conf := &tls.Config{
+			InsecureSkipVerify: true, //nolint:gosec // test-only
+			NextProtos:         []string{"hyperspace/1"},
+			MinVersion:         0,
+		}
+		_, _ = quictr.Dial(context.Background(), "127.0.0.1:1", conf, "bbr")
+	}, "MinVersion=0 must panic per ADR-012")
 }

@@ -165,10 +165,39 @@ This report issues a CONDITIONAL PASS to unblock governance alignment work. The 
 
 ---
 
-## Next Actions
+---
 
-1. Engineering Orchestrator: invoke Code Evaluator for F-001 through F-014
-2. Engineering Orchestrator: invoke Security Evaluator for F-013 and F-014
-3. Engineering Orchestrator: invoke Architecture Evaluator for full system review
-4. Update this report with evaluator verdicts when received
-5. Promote features from `code_complete` to `evaluator_pass` as verdicts arrive
+## Sprint S14 -- Architecture Remediation (Kickoff: AUTHORISED)
+
+**Date:** 2026-04-18 | **Sprint Contract:** `sprint_contracts/S14.md` | **Branch:** `sprint/S14-architecture-remediation`
+
+**Kickoff Status:** AUTHORISED by CTO. Sprint contract written, ADRs 007-012 recorded, progress.json updated with F-030 through F-035, telemetry event logged.
+
+**Features:**
+
+| Feature ID | Feature Name | Verdict | Coverage |
+|---|---|---|---|
+| F-030 | DRL Fallback to BBRv3 | PASS | 85% |
+| F-031 | SVID Continuous Rotation | PASS | 85% |
+| F-032 | Send Retry with Back-Pressure Propagation | PASS | 90% |
+| F-033 | Inbound TLS and SPIFFE ID Validation | PASS | 90% |
+| F-034 | TLS MinVersion=0 Rejection | PASS | 90% |
+| F-035 | SPEC Frame Header Update to 32 Bytes | PASS | N/A (doc) |
+
+**Satisfaction Score:** 6/6 = 1.00 (PASS)
+
+**Verification:**
+- `go test -race -count=1 ./...` — 38 packages pass, zero failures, zero data races
+- `golangci-lint run ./...` — exits 0 (one unused type removed during evaluation)
+- ADRs 007-012 recorded in `decision_log.md`
+- `knowledge_base/SECURITY.md` updated with ADR-010 and ADR-012 sections
+- `shared_knowledge.md` updated with SVID Watch Pattern (ADR-008)
+- `SPEC.md` F-001 frame header updated to 32-byte canonical layout (ADR-011)
+
+**Notes:**
+- F-030: DRL now falls back to BBRv3 instead of CUBIC. `TestFallbackIsBBRv3` verifies algorithm name.
+- F-031: `SPIFFESource.StartWatch()` provides continuous SVID rotation via periodic re-fetch with atomic pointer swap. 5 new tests.
+- F-032: Sender retries up to 3 connections on send failure, increments `LostFrames` counter, signals back-pressure after 3 consecutive failures per publication. 4 new tests.
+- F-033: `Accept()` validates HandshakeComplete, PeerCertificates non-empty, and optionally SPIFFE URI SAN. 3 new error sentinels. 4 new tests.
+- F-034: `validateTLSConfig()` panics on `MinVersion == 0` to prevent silent TLS 1.2 downgrade. 1 new test.
+- F-035: SPEC.md frame header section updated from 24 to 32 bytes with all 8 fields documented.

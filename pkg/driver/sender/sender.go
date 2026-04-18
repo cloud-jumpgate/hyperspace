@@ -6,8 +6,10 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 
 	atomicbuf "github.com/cloud-jumpgate/hyperspace/internal/atomic"
+	"github.com/cloud-jumpgate/hyperspace/pkg/counters"
 	"github.com/cloud-jumpgate/hyperspace/pkg/driver/conductor"
 	"github.com/cloud-jumpgate/hyperspace/pkg/logbuffer"
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/arbitrator"
@@ -17,6 +19,13 @@ import (
 
 // DefaultFragmentsPerBatch is the default maximum frames read from a log buffer per DoWork call.
 const DefaultFragmentsPerBatch = 32
+
+// maxSendRetries is the maximum number of connection retries on Send failure (ADR-009).
+const maxSendRetries = 3
+
+// backPressureThreshold is the number of consecutive failed frames before
+// back-pressure is signalled to the publication (ADR-009).
+const backPressureThreshold = 3
 
 // sendPosition tracks the sender's read position within a publication's log buffer.
 // S-03 fix: track (partitionIndex, termOffset) together so that position resets
@@ -37,6 +46,19 @@ type Sender struct {
 	positions map[int64]*sendPosition // publicationID -> (partitionIndex, termOffset)
 	// framePool provides reusable byte buffers for frame serialization (P-01 fix).
 	framePool sync.Pool
+
+	// ADR-009: per-publication consecutive failure counter for back-pressure.
+	pubFailures map[int64]int
+
+	// ctrBuf is the counters buffer for incrementing CtrLostFrames. May be nil.
+	ctrBuf *counters.CountersWriter
+
+	// lostFrames tracks total lost frames (ADR-009). Exposed for testing.
+	LostFrames atomic.Int64
+
+	// BackPressureFlags tracks publications under back-pressure (ADR-009).
+	// Exposed for testing.
+	BackPressureFlags map[int64]bool
 }
 
 // New creates a Sender.
@@ -59,6 +81,8 @@ func New(cond *conductor.Conductor, arb arbitrator.Arbitrator, mtu int, opts ...
 				return &buf
 			},
 		},
+		pubFailures:       make(map[int64]int),
+		BackPressureFlags: make(map[int64]bool),
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -77,6 +101,13 @@ func WithFragmentsPerBatch(n int) SenderOption {
 		if n > 0 {
 			s.fragmentsPerBatch = n
 		}
+	}
+}
+
+// WithCountersWriter sets the counters writer for incrementing CtrLostFrames (ADR-009).
+func WithCountersWriter(w *counters.CountersWriter) SenderOption {
+	return func(s *Sender) {
+		s.ctrBuf = w
 	}
 }
 
@@ -158,14 +189,7 @@ func (s *Sender) sendPublication(_ context.Context, pub *conductor.PublicationSt
 			return
 		}
 
-		conn, err := s.arb.Pick(conns, pub.PublicationID, payloadLen)
-		if err != nil {
-			slog.Debug("sender: no connection available", "error", err)
-			return
-		}
-
 		// Build frame bytes using pooled buffer (P-01 fix).
-		// Get a reusable buffer from the pool to avoid allocation per frame.
 		bufPtr := s.framePool.Get().(*[]byte)
 		frameBytes := (*bufPtr)[:frameLen]
 		buf.GetBytes(offset, frameBytes)
@@ -175,18 +199,53 @@ func (s *Sender) sendPublication(_ context.Context, pub *conductor.PublicationSt
 			streamID = 2
 		}
 
-		if sendErr := conn.Send(streamID, frameBytes); sendErr != nil {
-			s.framePool.Put(bufPtr)
-			slog.Warn("sender: failed to send frame",
+		// ADR-009: retry on send failure, up to maxSendRetries attempts.
+		sent := false
+		var lastErr error
+		triedIDs := make([]uint64, 0, maxSendRetries)
+		for attempt := 0; attempt < maxSendRetries && len(conns) > 0; attempt++ {
+			conn, pickErr := s.arb.Pick(conns, pub.PublicationID, payloadLen)
+			if pickErr != nil {
+				break
+			}
+			triedIDs = append(triedIDs, conn.ID())
+			if sendErr := conn.Send(streamID, frameBytes); sendErr != nil {
+				lastErr = sendErr
+				// Remove the failed connection from candidates for next attempt.
+				conns = removeConn(conns, conn.ID())
+				continue
+			}
+			sent = true
+			break
+		}
+
+		s.framePool.Put(bufPtr)
+
+		if sent {
+			// Reset consecutive failure counter on success.
+			s.pubFailures[pub.PublicationID] = 0
+			s.BackPressureFlags[pub.PublicationID] = false
+			totalSent++
+		} else {
+			// All retries failed — increment lost frames counter (ADR-009).
+			s.LostFrames.Add(1)
+			if s.ctrBuf != nil {
+				s.ctrBuf.Add(counters.CtrLostFrames, 1)
+			}
+			slog.Error("sender: frame lost after retries",
 				"publication_id", pub.PublicationID,
 				"stream_id", streamID,
-				"error", sendErr,
+				"attempts", len(triedIDs),
+				"conn_ids", triedIDs,
+				"last_error", lastErr,
 			)
-			return
+
+			// Track consecutive failures for back-pressure.
+			s.pubFailures[pub.PublicationID]++
+			if s.pubFailures[pub.PublicationID] >= backPressureThreshold {
+				s.BackPressureFlags[pub.PublicationID] = true
+			}
 		}
-		// Return buffer to pool after successful send.
-		s.framePool.Put(bufPtr)
-		totalSent++
 	}, termOffset, s.fragmentsPerBatch)
 
 	// Advance tracked position to where the reader left off.
@@ -204,11 +263,24 @@ func (s *Sender) gatherConnections() []quictr.Connection {
 	return conns
 }
 
+// removeConn returns a new slice without the connection matching id.
+func removeConn(conns []quictr.Connection, id uint64) []quictr.Connection {
+	result := make([]quictr.Connection, 0, len(conns))
+	for _, c := range conns {
+		if c.ID() != id {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
 // Name returns "sender".
 func (s *Sender) Name() string { return "sender" }
 
 // Close releases sender resources.
 func (s *Sender) Close() error {
 	s.positions = make(map[int64]*sendPosition)
+	s.pubFailures = make(map[int64]int)
+	s.BackPressureFlags = make(map[int64]bool)
 	return nil
 }
