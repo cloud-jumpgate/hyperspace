@@ -99,3 +99,6 @@ temp/
 *.tfplan
 .terraformrc
 terraform.rc
+embedded
+hsd
+hyperspace-stat
