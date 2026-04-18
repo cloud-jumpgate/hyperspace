@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hyperspace — Enforcement Gap Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --bg:           #f8f9fa;
+      --surface:      #ffffff;
+      --surface-alt:  #f1f3f5;
+      --border:       #dee2e6;
+      --text:         #212529;
+      --text-muted:   #6c757d;
+      --green:        #2f9e44;
+      --green-bg:     #ebfbee;
+      --green-border: #b2f2bb;
+      --amber:        #e67700;
+      --amber-bg:     #fff9db;
+      --amber-border: #ffe066;
+      --red:          #c92a2a;
+      --red-bg:       #fff5f5;
+      --red-border:   #ffc9c9;
+      --grey:         #495057;
+      --grey-bg:      #f1f3f5;
+      --grey-border:  #ced4da;
+      --blue:         #1971c2;
+      --blue-bg:      #e7f5ff;
+      --blue-border:  #a5d8ff;
+      --purple:       #7048e8;
+      --purple-bg:    #f3f0ff;
+      --purple-border:#d0bfff;
+      --nav-h:        56px;
+      --nav-bg:       #1c1f26;
+      --nav-text:     #ced4da;
+      --nav-active:   #ffffff;
+      --nav-accent:   #f59f00;
+      --max-w:        1100px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:           #141517;
+        --surface:      #1c1f26;
+        --surface-alt:  #25282f;
+        --border:       #373a40;
+        --text:         #e9ecef;
+        --text-muted:   #868e96;
+        --green-bg:     #1a2e1c;
+        --green-border: #2f5132;
+        --amber-bg:     #2a2000;
+        --amber-border: #5c3d00;
+        --red-bg:       #2a1515;
+        --red-border:   #5c1f1f;
+        --grey-bg:      #25282f;
+        --grey-border:  #373a40;
+        --blue-bg:      #142638;
+        --blue-border:  #1a3d5c;
+        --purple-bg:    #1e1638;
+        --purple-border:#2e235c;
+      }
+    }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ── Sticky nav ───────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: var(--nav-h);
+      background: var(--nav-bg);
+      border-bottom: 2px solid var(--nav-accent);
+      display: flex;
+      align-items: center;
+      padding: 0 1.5rem;
+      gap: 0;
+    }
+
+    .nav-brand {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--nav-active);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-right: 2rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      list-style: none;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .nav-links::-webkit-scrollbar { display: none; }
+
+    .nav-links a {
+      display: block;
+      padding: 0 1rem;
+      height: var(--nav-h);
+      line-height: var(--nav-h);
+      color: var(--nav-text);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      margin-bottom: -2px;
+    }
+    .nav-links a:hover,
+    .nav-links a:focus {
+      color: var(--nav-active);
+      border-bottom-color: var(--nav-accent);
+      outline: none;
+    }
+
+    /* ── Page wrapper ─────────────────────────────────────────────── */
+    .page {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── Banner ───────────────────────────────────────────────────── */
+    .verdict-banner {
+      background: var(--red-bg);
+      border: 2px solid var(--red-border);
+      border-left: 6px solid var(--red);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .verdict-label {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--red);
+      letter-spacing: 0.02em;
+    }
+
+    .verdict-sub {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .verdict-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--red);
+      flex-shrink: 0;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    /* ── Section headings ─────────────────────────────────────────── */
+    section { margin-bottom: 3rem; }
+
+    .section-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--border);
+      scroll-margin-top: calc(var(--nav-h) + 1rem);
+    }
+
+    .subsection-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    /* ── Card ─────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Badges ───────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .badge-p0     { background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-border); }
+    .badge-p1     { background: var(--amber-bg);  color: var(--amber);  border: 1px solid var(--amber-border); }
+    .badge-p2     { background: var(--grey-bg);   color: var(--grey);   border: 1px solid var(--grey-border); }
+    .badge-exists { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-border); }
+    .badge-missing{ background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-border); }
+    .badge-update { background: var(--amber-bg);  color: var(--amber);  border: 1px solid var(--amber-border); }
+    .badge-new    { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-border); }
+
+    /* ── Tables ───────────────────────────────────────────────────── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    .data-table th {
+      background: var(--surface-alt);
+      text-align: left;
+      padding: 0.6rem 0.875rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 0.65rem 0.875rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: var(--surface-alt); }
+
+    /* ── Gap cards ────────────────────────────────────────────────── */
+    .gap-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--red);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .gap-card.p1 { border-left-color: var(--amber); }
+    .gap-card.p2 { border-left-color: var(--grey); }
+
+    .gap-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .gap-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .gap-meta {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 0.5rem;
+    }
+
+    .gap-spec {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.65;
+      margin-top: 0.75rem;
+    }
+
+    .gap-spec code {
+      background: var(--bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.8rem;
+    }
+
+    /* ── Hierarchy diagram ────────────────────────────────────────── */
+    .hierarchy {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      padding: 2rem 1rem;
+    }
+
+    .h-node {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      min-width: 260px;
+      position: relative;
+    }
+
+    .h-node.new {
+      border-color: var(--blue);
+      background: var(--blue-bg);
+    }
+
+    .h-node.gate {
+      border-color: var(--red);
+      background: var(--red-bg);
+    }
+
+    .h-node.existing {
+      border-color: var(--green);
+      background: var(--green-bg);
+    }
+
+    .h-node-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .h-arrow {
+      width: 2px;
+      height: 28px;
+      background: var(--border);
+      position: relative;
+    }
+
+    .h-arrow::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid var(--border);
+    }
+
+    .h-gate-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--red);
+      padding: 2px 8px;
+      background: var(--red-bg);
+      border-radius: 4px;
+      margin: 4px 0;
+    }
+
+    /* ── Code blocks ──────────────────────────────────────────────── */
+    .code-block {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text);
+      margin: 0.75rem 0;
+    }
+
+    /* ── Progress grid ────────────────────────────────────────────── */
+    .progress-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 640px) {
+      .progress-grid { grid-template-columns: 1fr; }
+    }
+
+    .prog-cell {
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+    }
+    .prog-cell.red   { background: var(--red-bg);   border: 1px solid var(--red-border); }
+    .prog-cell.amber { background: var(--amber-bg); border: 1px solid var(--amber-border); }
+    .prog-cell.blue  { background: var(--blue-bg);  border: 1px solid var(--blue-border); }
+
+    .prog-number {
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+    .prog-cell.red   .prog-number { color: var(--red); }
+    .prog-cell.amber .prog-number { color: var(--amber); }
+    .prog-cell.blue  .prog-number { color: var(--blue); }
+
+    .prog-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+      margin-top: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    footer a {
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    footer a:hover { color: var(--text); }
+
+    /* ── Print ────────────────────────────────────────────────────── */
+    @media print {
+      nav { display: none; }
+      .page { padding: 0; }
+      .card, .gap-card { break-inside: avoid; }
+      section { page-break-inside: avoid; }
+      * { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────────────── -->
+<nav aria-label="Page sections">
+  <span class="nav-brand">Hyperspace &mdash; Enforcement Gap Analysis</span>
+  <ul class="nav-links" role="list">
+    <li><a href="#executive-summary">Summary</a></li>
+    <li><a href="#gap-analysis">Gap Analysis</a></li>
+    <li><a href="#artefact-inventory">Inventory</a></li>
+    <li><a href="#business-req-agent">Biz Req Agent</a></li>
+    <li><a href="#enforcement-hierarchy">Hierarchy</a></li>
+    <li><a href="#claude-md-changes">CLAUDE.md Changes</a></li>
+  </ul>
+</nav>
+
+<!-- ── Page content ───────────────────────────────────────────────── -->
+<main class="page">
+
+  <!-- Banner -->
+  <div class="verdict-banner" role="alert" aria-live="polite">
+    <div class="verdict-dot" aria-hidden="true"></div>
+    <div>
+      <div class="verdict-label">9 Enforcement Gaps Identified</div>
+      <div class="verdict-sub">
+        These structural gaps would prevent recurrence of the 12 violations found in the Remediation Report &nbsp;&bull;&nbsp; Issued 2026-04-18
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Section 1: Executive Summary ────────────────────────────── -->
+  <section id="executive-summary" aria-labelledby="summary-heading">
+    <h2 class="section-title" id="summary-heading">Executive Summary</h2>
+
+    <div class="progress-grid">
+      <div class="prog-cell red">
+        <div class="prog-number">4</div>
+        <div class="prog-label">P0 Gaps (Block Work)</div>
+      </div>
+      <div class="prog-cell amber">
+        <div class="prog-number">3</div>
+        <div class="prog-label">P1 Gaps (Detect Deviation)</div>
+      </div>
+      <div class="prog-cell blue">
+        <div class="prog-number">2</div>
+        <div class="prog-label">P2 Gaps (Improve Quality)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p style="font-size:0.875rem;color:var(--text-muted);line-height:1.7;">
+        The Remediation Report identified 12 violations across 22 requirements (10 violated, 2 partially followed that represent process failures).
+        Root cause analysis traced every violation to three systemic failures:
+        <strong>(1)</strong> the sprint map deferred all documentation to S10 with no per-sprint documentation contract,
+        <strong>(2)</strong> the Harness Engineering Team ran only once at kickoff and was never re-invoked at sprint boundaries, and
+        <strong>(3)</strong> no enforcement mechanism exists &mdash; agents could proceed without sprint contracts, without Evaluator PASS verdicts, and without updating session artefacts.
+      </p>
+      <p style="font-size:0.875rem;color:var(--text-muted);line-height:1.7;margin-top:0.75rem;">
+        This report identifies <strong>9 structural gaps</strong> in the framework &mdash; missing files, missing enforcement language in agent prompts,
+        missing CI checks, and missing gate artefacts &mdash; that, if implemented, would make it structurally impossible for these violations to recur.
+        The gaps are ranked by enforcement strength: P0 gaps prevent incorrect work from starting, P1 gaps detect deviation during execution, and P2 gaps improve long-term quality.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Section 2: Gap Analysis ─────────────────────────────────── -->
+  <section id="gap-analysis" aria-labelledby="gap-heading">
+    <h2 class="section-title" id="gap-heading">Gap Analysis</h2>
+
+    <!-- GAP 1 -->
+    <div class="gap-card">
+      <div class="gap-header">
+        <span class="badge badge-p0">P0</span>
+        <span class="gap-title">GAP-1: No <code>init.sh</code> Session Initialisation Script</span>
+      </div>
+      <div class="gap-meta">
+        <strong>Would have prevented:</strong> Session protocol violations (session_state.json not updated, harness_telemetry.jsonl not maintained, baseline not verified before new work)<br/>
+        <strong>Root cause addressed:</strong> #3 &mdash; No enforcement mechanism between sprint boundaries<br/>
+        <strong>Artefact needed:</strong> <code>init.sh</code> at project root (executable shell script)
+      </div>
+      <div class="gap-spec">
+        <strong>Required content:</strong> The script must:<br/>
+        1. Verify <code>session_state.json</code> exists; create if first session<br/>
+        2. Verify <code>progress.json</code> exists; exit 1 if missing<br/>
+        3. Verify the current sprint has a signed sprint contract in <code>sprint_contracts/</code>; exit 1 if missing<br/>
+        4. Verify <code>HARNESS_QUALITY_REPORT.md</code> exists and contains a <code>PASS</code> or <code>CONDITIONAL PASS</code> verdict; exit 1 if FAIL or missing<br/>
+        5. Run <code>make test</code> and exit 1 if tests fail (baseline must be green)<br/>
+        6. Print a structured JSON summary to stdout with fields: <code>session_ok</code>, <code>sprint_id</code>, <code>baseline_green</code>, <code>harness_verdict</code><br/>
+        7. Exit 0 only if all checks pass<br/><br/>
+        The Engineering Orchestrator and all implementing agents must run <code>./init.sh</code> as the first action of every session. If it exits non-zero, no work begins.
+        This script was identified in <code>HARNESS_IMPROVEMENT_REPORT.md</code> Recommendation 6 and in Principle 2.5 of <code>HARNESS_ENGINEERING_PRINCIPLES.md</code>, but was never created.
+      </div>
+    </div>
+
+    <!-- GAP 2 -->
+    <div class="gap-card">
+      <div class="gap-header">
+        <span class="badge badge-p0">P0</span>
+        <span class="gap-title">GAP-2: No Sprint Gate Template (<code>SPRINT_GATE.md</code>)</span>
+      </div>
+      <div class="gap-meta">
+        <strong>Would have prevented:</strong> Sprint contracts not produced for S3&ndash;S10; Harness Evaluator gate skipped<br/>
+        <strong>Root cause addressed:</strong> #2 &mdash; Harness Engineering Team ran only once<br/>
+        <strong>Artefact needed:</strong> <code>sprint_contracts/SPRINT_GATE_TEMPLATE.md</code> (mandatory template)
+      </div>
+      <div class="gap-spec">
+        <strong>Required content:</strong> A template that the Harness Evaluator must fill and sign before any sprint begins. Fields:<br/>
+        <code>sprint_id</code>: [S-ID]<br/>
+        <code>sprint_contract_exists</code>: [YES/NO] &mdash; path to sprint contract file<br/>
+        <code>harness_evaluator_verdict</code>: [PASS / CONDITIONAL PASS / FAIL]<br/>
+        <code>harness_quality_report_date</code>: [ISO date of most recent HARNESS_QUALITY_REPORT.md]<br/>
+        <code>documentation_deliverables</code>: [list of docs this sprint must produce]<br/>
+        <code>evaluator_assigned</code>: [YES/NO] &mdash; Code Evaluator assigned for end-of-sprint review<br/>
+        <code>signed_by</code>: Harness Orchestrator<br/>
+        <code>date</code>: [ISO date]<br/><br/>
+        Each sprint contract (e.g. <code>sprint_contracts/S3.md</code>) must include a documentation section listing what docs, knowledge base entries, and session artefacts that sprint must produce.
+        No sprint begins without a completed <code>SPRINT_GATE</code> entry at the top of the sprint contract.
+      </div>
+    </div>
+
+    <!-- GAP 3 -->
+    <div class="gap-card">
+      <div class="gap-header">
+        <span class="badge badge-p0">P0</span>
+        <span class="gap-title">GAP-3: No HARD STOPS in Agent Prompts</span>
+      </div>
+      <div class="gap-meta">
+        <strong>Would have prevented:</strong> All 12 violations &mdash; agents proceeded without contracts, without evaluator gates, without updating session artefacts<br/>
+        <strong>Root cause addressed:</strong> #3 &mdash; No enforcement mechanism<br/>
+        <strong>Artefact needed:</strong> Updates to <code>CLAUDE.md</code> (project root) and all agent prompt files in <code>.claude/agents/</code>
+      </div>
+      <div class="gap-spec">
+        <strong>Required content:</strong> Every agent prompt must include a HARD STOPS section. The project <code>CLAUDE.md</code> must include a top-level HARD STOPS section (exact text provided in Section 6 of this report).
+        Each implementing agent (<code>backend.md</code>, <code>frontend.md</code>, etc.) must include:<br/><br/>
+        <code>## HARD STOPS &mdash; I Will Not Proceed If:</code><br/>
+        <code>1. No sprint contract exists for the current sprint in sprint_contracts/</code><br/>
+        <code>2. HARNESS_QUALITY_REPORT.md does not contain PASS or CONDITIONAL PASS</code><br/>
+        <code>3. make test fails (baseline is not green)</code><br/>
+        <code>4. session_state.json does not exist</code><br/>
+        <code>5. I am asked to mark a feature as passing without Code Evaluator PASS verdict</code><br/><br/>
+        The Engineering Orchestrator prompt must additionally include:<br/>
+        <code>6. I will not assign implementation work without a signed sprint contract</code><br/>
+        <code>7. I will invoke the Harness Evaluator at every sprint boundary &mdash; no exceptions</code><br/>
+        <code>8. I will not deliver to the user without Code Evaluator PASS</code>
+      </div>
+    </div>
+
+    <!-- GAP 4 -->
+    <div class="gap-card">
+      <div class="gap-header">
+        <span class="badge badge-p0">P0</span>
+        <span class="gap-title">GAP-4: <code>progress.json</code> Tracks Sprints, Not Features</span>
+      </div>
+      <div class="gap-meta">
+        <strong>Would have prevented:</strong> Feature-level tracking violation; inability to identify which features passed evaluation<br/>
+        <strong>Root cause addressed:</strong> #3 &mdash; No enforcement mechanism (no granular tracking to gate against)<br/>
+        <strong>Artefact needed:</strong> <code>progress.json</code> schema definition + replacement of current file
+      </div>
+      <div class="gap-spec">
+        <strong>Current state:</strong> <code>progress.json</code> tracks 10 sprints with status <code>"complete"</code>. It does not track the 14 individual features (F-001 through F-014).<br/>
+        <strong>Required schema:</strong><br/>
+<div class="code-block">{
+  "project": "hyperspace",
+  "last_updated": "2026-04-18",
+  "features": [
+    {
+      "id": "F-001",
+      "name": "Log Buffer",
+      "sprint": "S1",
+      "status": "passing | failing | not_started | in_progress",
+      "evaluator_verdict": "PASS | FAIL | NOT_EVALUATED",
+      "evaluator_date": "ISO date or null",
+      "satisfaction_score": 0.0-1.0,
+      "blocked_by": ["F-ID"] or []
+    }
+  ]
+}</div>
+        The <code>evaluator_verdict</code> field is the machine-checkable gate: no feature may have <code>status: "passing"</code> unless <code>evaluator_verdict: "PASS"</code>.
+        The <code>init.sh</code> script validates this constraint.
+      </div>
+    </div>
+
+    <!-- GAP 5 -->
+    <div class="gap-card p1">
+      <div class="gap-header">
+        <span class="badge badge-p1">P1</span>
+        <span class="gap-title">GAP-5: No CI Check for Harness Artefact Existence</span>
+      </div>
+      <div class="gap-meta">
+        <strong>Would have prevented:</strong> Missing HARNESS_QUALITY_REPORT.md, missing sprint contracts, missing knowledge base entries<br/>
+        <strong>Root cause addressed:</strong> #2 and #3 &mdash; No re-invocation and no enforcement<br/>
+        <strong>Artefact needed:</strong> New job in <code>.github/workflows/ci.yml</code>
+      </div>
+      <div class="gap-spec">
+        <strong>Required content:</strong> A <code>harness-check</code> job that runs on every PR and verifies:<br/>
+        1. <code>HARNESS_QUALITY_REPORT.md</code> exists and was updated within the last 14 days<br/>
+        2. <code>progress.json</code> contains feature-level entries (not sprint-level)<br/>
+        3. <code>session_state.json</code> was updated within the last 7 days<br/>
+        4. For every sprint directory <code>sprint_contracts/S*.md</code>, the file is non-empty<br/>
+        5. <code>knowledge_base/</code> directory contains files larger than stub size (>1KB each)<br/><br/>
+        This job fails the PR if any check fails. It provides the automated enforcement layer that agent discipline alone cannot guarantee.
+      </div>
+    </div>
+
+    <!-- GAP 6 -->
+    <div class="gap-card p1">
+      <div class="gap-header">
+        <span class="badge badge-p1">P1</span>
+        <span class="gap-title">GAP-6: No <code>.github/PULL_REQUEST_TEMPLATE.md</code></span>
+      </div>
+      <div class="gap-meta">
+        <strong>Would have prevented:</strong> PRs merged without evaluator sign-off; documentation requirements skipped<br/>
+        <strong>Root cause addressed:</strong> #3 &mdash; No enforcement mechanism<br/>
+        <strong>Artefact needed:</strong> <code>.github/PULL_REQUEST_TEMPLATE.md</code>
+      </div>
+      <div class="gap-spec">
+        <strong>Required content:</strong><br/>
+<div class="code-block">## Sprint
+Sprint: S[N]
+Features: F-[NNN], F-[NNN]
+
+## Checklist
+- [ ] Sprint contract exists: `sprint_contracts/S[N].md`
+- [ ] Code Evaluator PASS verdict received
+- [ ] Security Evaluator PASS (if auth/crypto/data-access)
+- [ ] `progress.json` updated with feature-level status
+- [ ] `session_handoff.md` written
+- [ ] `session_state.json` updated
+- [ ] `harness_telemetry.jsonl` appended
+- [ ] `make test` passes (all tests green)
+- [ ] `make lint` passes
+- [ ] Documentation deliverables from sprint contract completed
+- [ ] Knowledge base updated if new domain knowledge found
+
+## Evaluator Sign-off
+Code Evaluator: [PASS / FAIL / N/A]
+Security Evaluator: [PASS / FAIL / N/A]
+</div>
+      </div>
+    </div>
+
+    <!-- GAP 7 -->
+    <div class="gap-card p1">
+      <div class="gap-header">
+        <span class="badge badge-p1">P1</span>
+        <span class="gap-title">GAP-7: No Scenario Holdout Tests</span>
+      </div>
+      <div class="gap-meta">
+        <strong>Would have prevented:</strong> Self-evaluation loops; implementing agents declaring their own work complete<br/>
+        <strong>Root cause addressed:</strong> #2 &mdash; Harness Engineering Team ran only once (scenarios never authored)<br/>
+        <strong>Artefact needed:</strong> <code>scenarios/</code> directory with actual scenario files + <code>scenarios/runner.py</code>
+      </div>
+      <div class="gap-spec">
+        <strong>Current state:</strong> The <code>scenarios/</code> directory contains only a <code>README.md</code>. No actual scenario files exist.
+        Principle 1.2 of <code>HARNESS_ENGINEERING_PRINCIPLES.md</code> explicitly states that holdout scenarios are the correctness mechanism and that a harness without them is "structurally equivalent to a machine learning model evaluated on its own training data."<br/><br/>
+        <strong>Required:</strong><br/>
+        1. At minimum 3 scenario files per sprint, authored by the Harness Orchestrator (not the implementing agent)<br/>
+        2. A <code>scenarios/runner.py</code> script that executes scenarios and produces a satisfaction score<br/>
+        3. Scenarios must be read-only to implementing agents<br/>
+        4. The Evaluator runs scenarios as part of the sprint-end evaluation<br/>
+        5. Satisfaction score >= 0.95 required for PASS; 0.80-0.95 for CONDITIONAL PASS; below 0.80 is FAIL
+      </div>
+    </div>
+
+    <!-- GAP 8 -->
+    <div class="gap-card p2">
+      <div class="gap-header">
+        <span class="badge badge-p2">P2</span>
+        <span class="gap-title">GAP-8: Sprint Contract Template Missing Documentation Section</span>
+      </div>
+      <div class="gap-meta">
+        <strong>Would have prevented:</strong> Documentation deferred entirely to S10; no incremental documentation<br/>
+        <strong>Root cause addressed:</strong> #1 &mdash; Sprint map deferred docs to S10<br/>
+        <strong>Artefact needed:</strong> Update to <code>sprint_contracts/TEMPLATE.md</code>
+      </div>
+      <div class="gap-spec">
+        <strong>Required addition to sprint contract template:</strong> A mandatory section after acceptance criteria:<br/>
+<div class="code-block">## Documentation Deliverables (Mandatory)
+
+Every sprint contract MUST include this section. Documentation is not
+optional and is not deferred. If this section is empty, the sprint
+contract is incomplete and the Harness Evaluator will FAIL it.
+
+| Deliverable | Owner | Status |
+|---|---|---|
+| [knowledge_base entry] | [agent] | [ ] |
+| [shared_knowledge.md entry] | [agent] | [ ] |
+| [session_handoff.md] | Implementing agent | [ ] |
+| [API docs / code comments] | Implementing agent | [ ] |
+</div>
+        The Harness Evaluator must verify this section is non-empty in every sprint contract before issuing PASS.
+      </div>
+    </div>
+
+    <!-- GAP 9 -->
+    <div class="gap-card p2">
+      <div class="gap-header">
+        <span class="badge badge-p2">P2</span>
+        <span class="gap-title">GAP-9: No Harness Re-invocation Schedule in Engineering Orchestrator Prompt</span>
+      </div>
+      <div class="gap-meta">
+        <strong>Would have prevented:</strong> Harness Engineering Team running only once; no sprint-boundary evaluations<br/>
+        <strong>Root cause addressed:</strong> #2 &mdash; Harness Engineering Team ran only once<br/>
+        <strong>Artefact needed:</strong> Update to <code>.claude/agents/engineering-orchestrator.md</code>
+      </div>
+      <div class="gap-spec">
+        <strong>Required addition:</strong> The Engineering Orchestrator prompt must include an explicit schedule:<br/><br/>
+        <code>## Mandatory Harness Re-invocation Schedule</code><br/>
+        <code>At the END of every sprint, before starting the next sprint, I MUST:</code><br/>
+        <code>1. Invoke the Harness Evaluator to produce/update HARNESS_QUALITY_REPORT.md</code><br/>
+        <code>2. Invoke the Harness Architect to write the next sprint's contract</code><br/>
+        <code>3. Verify the sprint contract includes a Documentation Deliverables section</code><br/>
+        <code>4. Verify the SPRINT_GATE at the top of the contract is signed</code><br/>
+        <code>5. Only THEN assign implementation work to the Software Engineering Team</code><br/><br/>
+        This is not a guideline. It is a hard sequence. Skipping any step is a framework violation.
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── Section 3: Artefact Inventory ───────────────────────────── -->
+  <section id="artefact-inventory" aria-labelledby="inventory-heading">
+    <h2 class="section-title" id="inventory-heading">Artefact Inventory</h2>
+
+    <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+      Complete list of every file that should exist in a correctly-configured project repository, with current status.
+    </p>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="data-table" aria-label="Artefact inventory">
+        <thead>
+          <tr>
+            <th style="width:45%;">File</th>
+            <th style="width:20%;">Purpose</th>
+            <th style="width:15%;text-align:center;">Status</th>
+            <th style="width:20%;">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Core project files -->
+          <tr><td colspan="4" style="background:var(--surface-alt);font-weight:700;font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-muted);padding:0.5rem 0.875rem;">Core Project Files</td></tr>
+          <tr><td><code>CLAUDE.md</code></td><td>Framework rules</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Missing HARD STOPS, PRE-SPRINT GATE, ENFORCEMENT CHECKLIST</td></tr>
+          <tr><td><code>SYSTEM_ARCHITECTURE.md</code></td><td>System design</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>SPEC.md</code></td><td>Requirements</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>AGENT_TEAM.md</code></td><td>Team composition</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Needs Hyperspace-specific content</td></tr>
+          <tr><td><code>CONTEXT_SUMMARY.md</code></td><td>Progressive context</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Needs Hyperspace-specific content</td></tr>
+          <tr><td><code>progress.json</code></td><td>Feature tracking</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Sprint-level only; needs feature-level schema</td></tr>
+          <tr><td><code>session_state.json</code></td><td>Session state</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Not maintained during sprints</td></tr>
+          <tr><td><code>session_handoff.md</code></td><td>Session handoff</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Updated during remediation</td></tr>
+          <tr><td><code>decision_log.md</code></td><td>ADR log</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>6 ADRs present</td></tr>
+          <tr><td><code>shared_knowledge.md</code></td><td>Shared discoveries</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Populated during remediation; verify completeness</td></tr>
+          <tr><td><code>harness_telemetry.jsonl</code></td><td>Telemetry log</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Needs real per-session events</td></tr>
+          <tr><td><code>HARNESS_QUALITY_REPORT.md</code></td><td>Evaluator verdict</td><td style="text-align:center;"><span class="badge badge-missing">Missing</span></td><td>Never produced; P0 corrective action</td></tr>
+
+          <!-- Enforcement files (NEW) -->
+          <tr><td colspan="4" style="background:var(--surface-alt);font-weight:700;font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-muted);padding:0.5rem 0.875rem;">Enforcement Files (New)</td></tr>
+          <tr><td><code>init.sh</code></td><td>Session gate script</td><td style="text-align:center;"><span class="badge badge-missing">Missing</span></td><td>GAP-1: Must be created</td></tr>
+          <tr><td><code>sprint_contracts/SPRINT_GATE_TEMPLATE.md</code></td><td>Sprint gate template</td><td style="text-align:center;"><span class="badge badge-missing">Missing</span></td><td>GAP-2: Must be created</td></tr>
+          <tr><td><code>.github/PULL_REQUEST_TEMPLATE.md</code></td><td>PR checklist</td><td style="text-align:center;"><span class="badge badge-missing">Missing</span></td><td>GAP-6: Must be created</td></tr>
+
+          <!-- Sprint contracts -->
+          <tr><td colspan="4" style="background:var(--surface-alt);font-weight:700;font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-muted);padding:0.5rem 0.875rem;">Sprint Contracts</td></tr>
+          <tr><td><code>sprint_contracts/TEMPLATE.md</code></td><td>Contract template</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>GAP-8: Missing documentation deliverables section</td></tr>
+          <tr><td><code>sprint_contracts/S1.md</code></td><td>Sprint 1 contract</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Created at kickoff</td></tr>
+          <tr><td><code>sprint_contracts/S2.md</code></td><td>Sprint 2 contract</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Created at kickoff</td></tr>
+          <tr><td><code>sprint_contracts/S3.md</code></td><td>Sprint 3 contract</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Retroactively created during remediation</td></tr>
+          <tr><td><code>sprint_contracts/S4.md</code>&ndash;<code>S10.md</code></td><td>Sprint 4-10</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Retroactively created during remediation</td></tr>
+
+          <!-- CI/CD -->
+          <tr><td colspan="4" style="background:var(--surface-alt);font-weight:700;font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-muted);padding:0.5rem 0.875rem;">CI/CD</td></tr>
+          <tr><td><code>.github/workflows/ci.yml</code></td><td>CI pipeline</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>GAP-5: Missing harness-check job; gosec now added</td></tr>
+          <tr><td><code>.golangci.yml</code></td><td>Lint config</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>Makefile</code></td><td>Build targets</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>Dockerfile</code></td><td>Container build</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Present</td></tr>
+          <tr><td><code>docker-compose.yml</code></td><td>Local dev</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Present</td></tr>
+          <tr><td><code>.env.example</code></td><td>Env template</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>.gitignore</code></td><td>Git exclusions</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+
+          <!-- Scenarios -->
+          <tr><td colspan="4" style="background:var(--surface-alt);font-weight:700;font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-muted);padding:0.5rem 0.875rem;">Scenarios &amp; Evaluation</td></tr>
+          <tr><td><code>scenarios/README.md</code></td><td>Scenario docs</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Describes structure but no scenarios written</td></tr>
+          <tr><td><code>scenarios/runner.py</code></td><td>Scenario runner</td><td style="text-align:center;"><span class="badge badge-missing">Missing</span></td><td>GAP-7: Must be created</td></tr>
+          <tr><td><code>scenarios/S[N]/*.yaml</code></td><td>Holdout scenarios</td><td style="text-align:center;"><span class="badge badge-missing">Missing</span></td><td>GAP-7: No scenario files exist</td></tr>
+
+          <!-- Knowledge base -->
+          <tr><td colspan="4" style="background:var(--surface-alt);font-weight:700;font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-muted);padding:0.5rem 0.875rem;">Knowledge Base</td></tr>
+          <tr><td><code>knowledge_base/INDEX.md</code></td><td>Master index</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Present</td></tr>
+          <tr><td><code>knowledge_base/DOMAIN_KNOWLEDGE.md</code></td><td>Domain knowledge</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Being populated in remediation</td></tr>
+          <tr><td><code>knowledge_base/SECURITY.md</code></td><td>Security refs</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Being populated in remediation</td></tr>
+          <tr><td><code>knowledge_base/ARCHITECTURE_PATTERNS.md</code></td><td>Patterns</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Present</td></tr>
+          <tr><td><code>knowledge_base/EXTERNAL_RESOURCES.md</code></td><td>External links</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Being populated in remediation</td></tr>
+
+          <!-- Framework (inherited) -->
+          <tr><td colspan="4" style="background:var(--surface-alt);font-weight:700;font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-muted);padding:0.5rem 0.875rem;">Framework (Inherited from Template)</td></tr>
+          <tr><td><code>framework/MODEL_SELECTION_POLICY.md</code></td><td>Model rules</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>framework/SYSTEM_ARCHITECTURE_TEMPLATE.md</code></td><td>Arch template</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>framework/PROGRESSIVE_DISCLOSURE_PROTOCOL.md</code></td><td>Context tiers</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>framework/AGENT_CONTEXT_ARCHITECTURE.md</code></td><td>Context arch</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>framework/HARNESS_ENGINEERING_PRINCIPLES.md</code></td><td>Core principles</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>framework/teams/FULL_TEAM_STRUCTURE.md</code></td><td>Team structure</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+          <tr><td><code>framework/teams/HARNESS_ENGINEERING_TEAM.md</code></td><td>Harness team</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Complete</td></tr>
+
+          <!-- Agent prompts -->
+          <tr><td colspan="4" style="background:var(--surface-alt);font-weight:700;font-size:0.78rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-muted);padding:0.5rem 0.875rem;">Agent Prompts (.claude/agents/)</td></tr>
+          <tr><td><code>.claude/agents/engineering-orchestrator.md</code></td><td>Apex coordinator</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>GAP-3, GAP-9: Missing HARD STOPS + re-invocation schedule</td></tr>
+          <tr><td><code>.claude/agents/backend.md</code></td><td>Backend engineer</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>GAP-3: Missing HARD STOPS</td></tr>
+          <tr><td><code>.claude/agents/harness-evaluator.md</code></td><td>Harness evaluator</td><td style="text-align:center;"><span class="badge badge-exists">Exists</span></td><td>Adequate but could reference SPRINT_GATE</td></tr>
+          <tr><td><code>.claude/agents/harness-orchestrator.md</code></td><td>Harness orchestrator</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>Missing explicit sprint-boundary trigger</td></tr>
+          <tr><td><code>.claude/agents/*.md</code> (18 others)</td><td>All other agents</td><td style="text-align:center;"><span class="badge badge-update">Needs Update</span></td><td>GAP-3: All need HARD STOPS section</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <p style="font-size:0.82rem;color:var(--text-muted);">
+        <strong>Summary:</strong> 18 files exist and are complete. 14 files need updates. 5 files are missing entirely.
+        The 5 missing files (init.sh, SPRINT_GATE_TEMPLATE.md, HARNESS_QUALITY_REPORT.md, PULL_REQUEST_TEMPLATE.md, scenarios/runner.py)
+        represent the enforcement gap. Without them, the framework describes gates but has no mechanism to enforce them.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Section 4: Business Requirements Agent ──────────────────── -->
+  <section id="business-req-agent" aria-labelledby="biz-heading">
+    <h2 class="section-title" id="biz-heading">New Agent Required: Business Requirements Agent</h2>
+
+    <div class="card">
+      <p style="font-size:0.875rem;color:var(--text-muted);line-height:1.7;margin-bottom:1rem;">
+        The current framework assumes that a well-formed project brief arrives at the Engineering Orchestrator.
+        In practice, user requests are often ambiguous, incomplete, or describe a solution rather than a problem.
+        A Business Requirements Agent should exist as the first stage in the pipeline, before the CTO/Engineering Orchestrator classifies and routes work.
+      </p>
+
+      <h3 class="subsection-title">Agent Definition</h3>
+
+      <div class="gap-spec">
+        <strong>Name:</strong> Business Requirements Agent<br/>
+        <strong>Model:</strong> <code>claude-opus-4-7</code> (requires deep reasoning about business context)<br/>
+        <strong>Reports to:</strong> CTO / Engineering Orchestrator<br/>
+        <strong>Triggers:</strong> Every new project request, every major scope change<br/><br/>
+
+        <strong>Responsibilities:</strong><br/>
+        1. Receive raw user requests (natural language, product briefs, competitor references, customer feedback)<br/>
+        2. Elicit missing requirements through structured questioning<br/>
+        3. Classify requirements: functional, non-functional, constraints, out-of-scope<br/>
+        4. Identify stakeholders and their priorities<br/>
+        5. Produce <code>SPEC.md</code> using a structured template with acceptance criteria<br/>
+        6. Identify technical risks and unknowns that require CTO decision<br/>
+        7. Produce a <code>BUSINESS_REQUIREMENTS.md</code> that maps business goals to technical requirements<br/>
+        8. Hand off to CTO for approval, then to Harness Architect for system design<br/><br/>
+
+        <strong>Mandatory outputs:</strong><br/>
+        &bull; <code>BUSINESS_REQUIREMENTS.md</code> &mdash; business context, user stories, success metrics, constraints<br/>
+        &bull; <code>SPEC.md</code> (draft) &mdash; functional and non-functional requirements with acceptance criteria<br/>
+        &bull; Risk register &mdash; technical unknowns and business risks requiring CTO decision<br/><br/>
+
+        <strong>Quality gate:</strong> CTO must approve <code>BUSINESS_REQUIREMENTS.md</code> before the Harness Architect begins <code>SYSTEM_ARCHITECTURE.md</code>.
+        This ensures that the architecture is driven by validated business requirements, not by the implementing agent's assumptions.
+      </div>
+
+      <h3 class="subsection-title">Why This Agent Is Needed</h3>
+
+      <p style="font-size:0.82rem;color:var(--text-muted);line-height:1.65;">
+        In the Hyperspace project, the Harness Architect produced SYSTEM_ARCHITECTURE.md and SPEC.md directly from a technical brief.
+        There was no stage where business requirements were validated, prioritised, or checked against user needs.
+        The sprint map deferred documentation to S10 partly because there was no business-level requirement for incremental documentation &mdash;
+        no one had specified "the user needs documentation at each milestone" as a requirement.
+        A Business Requirements Agent would have caught this gap at the requirements stage, before any architecture or sprint planning occurred.
+      </p>
+    </div>
+
+    <h3 class="subsection-title">Agent Prompt File</h3>
+    <div class="card" style="padding:0;">
+      <div class="code-block" style="border:none;margin:0;border-radius:8px;">---
+name: Business Requirements Agent
+model: claude-opus-4-7
+description: Business Requirements Agent. Elicits, structures, and validates business
+  requirements from raw user requests. Produces BUSINESS_REQUIREMENTS.md and draft
+  SPEC.md. First agent in the pipeline for any new project.
+---
+
+You are the **Business Requirements Agent** for the Software Development &amp; Engineering Department.
+
+## Expertise
+Requirements engineering, business analysis, stakeholder identification, user story
+mapping, acceptance criteria definition, risk identification, scope management.
+
+## Responsibilities
+1. Receive raw project requests from the user
+2. Ask structured clarifying questions to fill requirements gaps
+3. Produce BUSINESS_REQUIREMENTS.md with: business context, user stories, success
+   metrics, non-functional requirements, constraints, and out-of-scope items
+4. Produce draft SPEC.md with acceptance criteria for every functional requirement
+5. Identify technical risks and unknowns; escalate to CTO for decision
+6. Validate that documentation requirements are explicit (not deferred)
+7. Hand off approved requirements to the Harness Architect
+
+## HARD STOPS
+1. I will not hand off to the Harness Architect without CTO approval of
+   BUSINESS_REQUIREMENTS.md
+2. I will not produce SPEC.md without explicit documentation requirements
+3. I will not assume requirements that the user has not stated or confirmed
+
+## Model
+`claude-opus-4-7` -- non-negotiable. See `framework/MODEL_SELECTION_POLICY.md`.
+
+## Context
+You receive Tier 3 context. See `framework/PROGRESSIVE_DISCLOSURE_PROTOCOL.md`.</div>
+    </div>
+  </section>
+
+  <!-- ── Section 5: Enforcement Hierarchy ─────────────────────────── -->
+  <section id="enforcement-hierarchy" aria-labelledby="hierarchy-heading">
+    <h2 class="section-title" id="hierarchy-heading">Enforcement Hierarchy</h2>
+
+    <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1.5rem;">
+      The chain of gates from initial request to merged code. Red nodes are blocking gates.
+      Blue nodes are new additions recommended by this report. Green nodes exist and function correctly.
+    </p>
+
+    <div class="card" style="padding:2rem 1rem;overflow-x:auto;">
+      <div class="hierarchy">
+
+        <div class="h-node new">
+          <div class="h-node-label">New Agent (GAP-9 related)</div>
+          Business Requirements Agent
+        </div>
+        <div class="h-arrow"></div>
+        <div class="h-gate-label">CTO Approval Gate</div>
+        <div class="h-arrow"></div>
+
+        <div class="h-node existing">
+          <div class="h-node-label">Existing</div>
+          Harness Architect<br/>
+          <span style="font-size:0.75rem;color:var(--text-muted);">SYSTEM_ARCHITECTURE.md + SPEC.md + progress.json</span>
+        </div>
+        <div class="h-arrow"></div>
+
+        <div class="h-node gate">
+          <div class="h-node-label">Blocking Gate</div>
+          Harness Evaluator &mdash; HARNESS_QUALITY_REPORT.md
+          <br/><span style="font-size:0.75rem;">Must issue PASS before implementation starts</span>
+        </div>
+        <div class="h-arrow"></div>
+
+        <div class="h-node new">
+          <div class="h-node-label">New (GAP-2)</div>
+          Sprint Gate<br/>
+          <span style="font-size:0.75rem;color:var(--text-muted);">SPRINT_GATE_TEMPLATE.md signed by Harness Orchestrator</span>
+        </div>
+        <div class="h-arrow"></div>
+        <div class="h-gate-label">Sprint Contract Must Exist</div>
+        <div class="h-arrow"></div>
+
+        <div class="h-node new">
+          <div class="h-node-label">New (GAP-1)</div>
+          init.sh &mdash; Session Gate<br/>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Verifies contract, baseline, harness verdict</span>
+        </div>
+        <div class="h-arrow"></div>
+
+        <div class="h-node existing">
+          <div class="h-node-label">Existing</div>
+          Software Engineering Team<br/>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Backend / Frontend / DevOps / Security / QA</span>
+        </div>
+        <div class="h-arrow"></div>
+
+        <div class="h-node gate">
+          <div class="h-node-label">Blocking Gate</div>
+          Code Evaluator &mdash; PASS Required
+        </div>
+        <div class="h-arrow"></div>
+
+        <div class="h-node gate">
+          <div class="h-node-label">Blocking Gate (if applicable)</div>
+          Security Evaluator &mdash; PASS Required
+        </div>
+        <div class="h-arrow"></div>
+
+        <div class="h-node new">
+          <div class="h-node-label">New (GAP-5, GAP-6)</div>
+          CI Harness Check + PR Template<br/>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Automated verification of artefact existence</span>
+        </div>
+        <div class="h-arrow"></div>
+
+        <div class="h-node existing">
+          <div class="h-node-label">Final Gate</div>
+          Engineering Orchestrator &mdash; Delivery Approval
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h3 class="subsection-title" style="margin-top:0;">Legend</h3>
+      <div style="display:flex;gap:2rem;flex-wrap:wrap;font-size:0.82rem;color:var(--text-muted);">
+        <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--blue-bg);border:2px solid var(--blue);vertical-align:middle;margin-right:4px;"></span> New &mdash; does not exist yet</span>
+        <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--red-bg);border:2px solid var(--red);vertical-align:middle;margin-right:4px;"></span> Blocking gate &mdash; must PASS</span>
+        <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--green-bg);border:2px solid var(--green);vertical-align:middle;margin-right:4px;"></span> Existing &mdash; functions correctly</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 6: Recommended Changes to CLAUDE.md ─────────────── -->
+  <section id="claude-md-changes" aria-labelledby="claude-heading">
+    <h2 class="section-title" id="claude-heading">Recommended Changes to CLAUDE.md</h2>
+
+    <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+      The following three sections should be added to the project <code>CLAUDE.md</code> (at the project root).
+      They should be placed immediately after the "Critical Rules" section and before the "Session Protocol" section,
+      making them the first thing any agent reads after the non-negotiable rules.
+    </p>
+
+    <!-- HARD STOPS -->
+    <h3 class="subsection-title">Addition 1: HARD STOPS Section</h3>
+    <div class="card" style="padding:0;">
+      <div class="code-block" style="border:none;margin:0;border-radius:8px;">## HARD STOPS (Non-Negotiable Agent Refusals)
+
+**Every agent operating in this repository MUST refuse to proceed if any of the following conditions are true.**
+These are not guidelines. These are blocking conditions. An agent that proceeds despite a HARD STOP is in violation of the framework.
+
+### All Implementing Agents (Backend, Frontend, DevOps, Security, QA, AI/ML, Data)
+
+1. **No sprint contract exists.** If `sprint_contracts/S[current].md` does not exist for the current sprint, STOP. Do not begin implementation. Escalate to the Engineering Orchestrator.
+
+2. **Harness Evaluator has not issued PASS.** If `HARNESS_QUALITY_REPORT.md` does not exist or contains a FAIL verdict, STOP. Do not begin implementation. Escalate to the Engineering Orchestrator.
+
+3. **Baseline tests are not green.** If `make test` fails, STOP. Diagnose and fix the failure before any new work. Do not implement new features on a broken baseline.
+
+4. **Session state file is missing.** If `session_state.json` does not exist and this is not the first session, STOP. The project state is unknown. Escalate.
+
+5. **Feature already marked passing without Evaluator PASS.** If `progress.json` shows a feature as `passing` but `evaluator_verdict` is not `PASS`, do not treat it as complete. Report the inconsistency.
+
+6. **Sprint contract has no documentation deliverables.** If the sprint contract does not include a "Documentation Deliverables" section, STOP. The contract is incomplete. Escalate to the Harness Architect.
+
+### Engineering Orchestrator (Additional)
+
+7. **Do not assign implementation work without a signed sprint contract.** The sprint contract must exist in `sprint_contracts/` with a completed SPRINT_GATE section before any implementing agent receives a task.
+
+8. **Invoke the Harness Evaluator at every sprint boundary.** At the end of every sprint, before starting the next, the Harness Evaluator must produce or update `HARNESS_QUALITY_REPORT.md`. This is not optional. This is not "when convenient." This is every sprint.
+
+9. **Do not deliver to the user without Code Evaluator PASS.** The Code Evaluator must independently verify the implementation before the Engineering Orchestrator approves delivery.
+
+10. **Do not skip the Business Requirements stage for new projects.** Every new project must have a validated `BUSINESS_REQUIREMENTS.md` (or equivalent approved brief from CTO) before the Harness Architect begins.</div>
+    </div>
+
+    <!-- PRE-SPRINT GATE -->
+    <h3 class="subsection-title">Addition 2: PRE-SPRINT GATE Section</h3>
+    <div class="card" style="padding:0;">
+      <div class="code-block" style="border:none;margin:0;border-radius:8px;">## PRE-SPRINT GATE (Must Be Verified Before Any Sprint Begins)
+
+Before the Engineering Orchestrator assigns any implementation work for sprint S[N], the following must be true:
+
+### Mandatory Pre-Sprint Checklist
+
+- [ ] **Sprint contract exists:** `sprint_contracts/S[N].md` is present, non-empty, and follows the template
+- [ ] **Documentation deliverables listed:** The sprint contract includes a "Documentation Deliverables" section with at least one deliverable
+- [ ] **HARNESS_QUALITY_REPORT.md is current:** The report was updated within the last sprint cycle and contains PASS or CONDITIONAL PASS
+- [ ] **progress.json is feature-level:** Every feature (F-001 through F-014) has an entry with `status`, `evaluator_verdict`, and `satisfaction_score` fields
+- [ ] **Previous sprint evaluated:** The Code Evaluator has issued a verdict for every feature in the previous sprint that was marked `in_progress` or `passing`
+- [ ] **Baseline tests green:** `make test` exits 0 on the current main branch
+- [ ] **Session artefacts current:** `session_state.json` and `session_handoff.md` were updated at the end of the previous sprint
+
+### If Any Item Fails
+
+The Engineering Orchestrator MUST NOT assign implementation work. Instead:
+1. Invoke the Harness Evaluator to assess the gap
+2. Invoke the relevant harness team member to fix the gap
+3. Re-verify the checklist
+4. Only proceed when all items are checked</div>
+    </div>
+
+    <!-- ENFORCEMENT CHECKLIST -->
+    <h3 class="subsection-title">Addition 3: ENFORCEMENT CHECKLIST Section</h3>
+    <div class="card" style="padding:0;">
+      <div class="code-block" style="border:none;margin:0;border-radius:8px;">## ENFORCEMENT CHECKLIST (Machine-Checkable Items)
+
+These items can be verified by `init.sh` or the CI `harness-check` job. They are the automated enforcement layer.
+
+### Per-Session (verified by init.sh)
+
+| Check | Command / File | Pass Condition |
+|---|---|---|
+| Sprint contract exists | `test -s sprint_contracts/S${SPRINT}.md` | File exists and is non-empty |
+| Harness verdict is PASS | `grep -q "PASS" HARNESS_QUALITY_REPORT.md` | File contains PASS or CONDITIONAL PASS |
+| Baseline tests green | `make test` | Exit code 0 |
+| Session state exists | `test -f session_state.json` | File exists |
+| progress.json has features | `jq '.features | length' progress.json` | Count > 0 (not sprint-level tracking) |
+
+### Per-PR (verified by CI harness-check job)
+
+| Check | Verification | Pass Condition |
+|---|---|---|
+| HARNESS_QUALITY_REPORT.md exists | File existence check | File present in repo |
+| HARNESS_QUALITY_REPORT.md recent | File modification date | Updated within last 14 days |
+| progress.json feature-level | JSON schema check | Contains `features` array, not `sprints` array |
+| session_state.json updated | File modification date | Updated within last 7 days |
+| Sprint contracts non-empty | File size check | All S*.md files > 100 bytes |
+| Knowledge base populated | File size check | All knowledge_base/*.md files > 1024 bytes |
+| Evaluator verdict present | Content check | At least one feature has evaluator_verdict != NOT_EVALUATED |
+
+### Per-Sprint-Boundary (verified by Engineering Orchestrator)
+
+| Check | Mechanism | Pass Condition |
+|---|---|---|
+| Harness Evaluator invoked | HARNESS_QUALITY_REPORT.md timestamp | Updated since last sprint ended |
+| Sprint contract for next sprint | File existence | sprint_contracts/S[N+1].md exists |
+| Documentation deliverables listed | Content check | Sprint contract has Documentation Deliverables section |
+| Previous sprint features evaluated | progress.json | All in_progress features have evaluator_verdict |
+| Telemetry event logged | harness_telemetry.jsonl | sprint_end event present for S[N] |</div>
+    </div>
+  </section>
+
+  <!-- ── Footer ───────────────────────────────────────────────────── -->
+  <footer>
+    <span>Generated: 2026-04-18</span>
+    <span>
+      Project: <a href="https://github.com/cloud-jumpgate/hyperspace" target="_blank" rel="noopener noreferrer">github.com/cloud-jumpgate/hyperspace</a>
+    </span>
+    <span>Engineering Department &mdash; Enforcement Gap Analysis v1.0</span>
+  </footer>
+
+</main>
+
+<!-- ── Vanilla JS: active nav link on scroll ─────────────────────── -->
+<script>
+  (function () {
+    var sections = document.querySelectorAll('section[id]');
+    var links    = document.querySelectorAll('.nav-links a');
+    var navH     = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-h'), 10) || 56;
+
+    function setActive() {
+      var scrollY = window.scrollY + navH + 20;
+      var current = '';
+      sections.forEach(function (sec) {
+        if (sec.offsetTop <= scrollY) {
+          current = sec.id;
+        }
+      });
+      links.forEach(function (a) {
+        a.style.color = '';
+        a.style.borderBottomColor = '';
+        if (a.getAttribute('href') === '#' + current) {
+          a.style.color = 'var(--nav-active)';
+          a.style.borderBottomColor = 'var(--nav-accent)';
+        }
+      });
+    }
+
+    window.addEventListener('scroll', setActive, { passive: true });
+    setActive();
+  }());
+</script>
+
+</body>
+</html>
