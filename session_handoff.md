@@ -6,10 +6,60 @@
 
 ## Latest Handoff
 
+**Session ID:** sess_20260418_S14
+**Date:** 2026-04-18T19:00:00Z
+**Sprint:** S14 -- Architecture Remediation
+**Status:** COMPLETE -- merged to main via PR #12
+
+### What was done this session
+
+Sprint S14 resolved 6 critical/high findings from the Architecture Evaluator report (S1-S13 review):
+
+1. **F-030 (ADR-007):** DRL congestion control fallback changed from CUBIC to BBRv3. `pkg/cc/drl/drl.go` imports `bbrv3` instead of `cubic`. New `export_test.go` exposes `FallbackName()`. `TestFallbackIsBBRv3` verifies.
+
+2. **F-031 (ADR-008):** SVID continuous rotation. `pkg/identity/identity.go` adds `StartWatch(ctx)` which does an initial SVID fetch then periodically re-fetches, swapping the `tls.Config` via `atomic.Pointer`. `TLSConfig()` provides lock-free read. `Close()` cancels the watcher and waits for goroutine exit. 5 new tests.
+
+3. **F-032 (ADR-009):** Send retry with back-pressure. `pkg/driver/sender/sender.go` retries up to 3 connections per frame (removing failed connections from candidates). On exhaustion: increments `LostFrames` atomic counter, increments counters buffer `CtrLostFrames`, logs at Error. After 3 consecutive failures per publication, sets `BackPressureFlags[pubID] = true`. Success resets counter and flag. 4 new tests.
+
+4. **F-033 (ADR-010):** Inbound TLS and SPIFFE ID validation. `pkg/transport/quic/conn.go` `Accept()` now returns `(Connection, error)`, validates `HandshakeComplete`, `PeerCertificates` non-empty, and optionally requires SPIFFE URI SAN via `AcceptConfig{RequireSPIFFE: true}`. 3 error sentinels added. 4 new tests. Test helpers updated for mTLS (server requires client cert, client presents one).
+
+5. **F-034 (ADR-012):** `validateTLSConfig()` panics on `MinVersion == 0`. Prevents silent TLS 1.2 downgrade. 1 new test.
+
+6. **F-035 (ADR-011):** SPEC.md F-001 frame header updated from 24-byte to 32-byte canonical layout with all 8 fields documented.
+
+### Documentation deliverables completed
+
+- `decision_log.md`: ADRs 007-012
+- `knowledge_base/SECURITY.md`: TLS MinVersion=0 Rejection section, Inbound SPIFFE ID Validation section
+- `shared_knowledge.md`: Sprint S14 SVID Watch Pattern (ADR-008)
+- `SPEC.md`: F-001 frame header 32-byte layout
+- `sprint_contracts/S14.md`: Sprint contract with 6 features, acceptance criteria, DoD
+
+### Verification
+
+- `go test -race -count=1 ./...` -- 38 packages pass, zero failures, zero data races
+- `golangci-lint run ./...` -- exits 0 (one unused interface type `x509ContextWatcher` removed)
+- All 6 features at `evaluator_pass` in `progress.json`
+- PR #12 merged to main
+
+### Blockers
+
+None.
+
+### Next actions
+
+- Invoke Security Evaluator for F-013 (AWS Integration) and F-014 (SPIFFE/SPIRE) -- still pending from S9
+- Consider next sprint scope (S15): candidates include end-to-end integration test suite, production deployment manifests, or performance benchmark baseline on c7gn.4xlarge
+- Architecture Evaluator re-review: all 6 findings from the S1-S13 review are now resolved
+
+---
+
+## Previous Handoff
+
 **Session ID:** sess_20260418_S10
 **Date:** 2026-04-18T00:00:00Z
-**Sprint:** S10 — CI/CD + Docs
-**Status:** COMPLETE — all 10 sprints delivered
+**Sprint:** S10 -- CI/CD + Docs
+**Status:** COMPLETE -- all 10 sprints delivered
 
 ### What was done this session
 
