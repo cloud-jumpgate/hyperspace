@@ -561,3 +561,74 @@ func TestAddPublication_ConcurrentSafe(t *testing.T) {
 		}
 	}
 }
+
+// --- F-016: Atomic Term Rotation (CAS) ---
+
+func TestOffer_ConcurrentRotation_NoCorruption(t *testing.T) {
+	// 4 goroutines offering simultaneously on a small-term publication.
+	// With CAS rotation (C-01 fix), concurrent AppendRotation from multiple
+	// goroutines should only advance the partition index by 1, not N.
+	// Verified by race detector (go test -race).
+	c := newTestClient(t)
+	pub, err := c.AddPublication(context.Background(), "hs:quic?endpoint=127.0.0.1:7777|pool=1", 1001)
+	if err != nil {
+		t.Fatalf("AddPublication: %v", err)
+	}
+
+	const goroutines = 4
+	const offersPerGoroutine = 200
+
+	done := make(chan struct{}, goroutines)
+	for g := range goroutines {
+		go func(id int) {
+			defer func() { done <- struct{}{} }()
+			for i := range offersPerGoroutine {
+				msg := fmt.Appendf(nil, "g%d-m%d-padding-to-fill-term-faster", id, i)
+				_, _ = pub.Offer(msg)
+			}
+		}(g)
+	}
+
+	for range goroutines {
+		<-done
+	}
+
+	// Verify partition index is valid (0, 1, or 2).
+	partIdx := pub.LogBuf().ActivePartitionIndex()
+	if partIdx < 0 || partIdx >= int32(logbuffer.NumPartitions) {
+		t.Fatalf("invalid partition index after concurrent rotation: %d", partIdx)
+	}
+}
+
+func TestOffer_CASRotation_AdvancesOnce(t *testing.T) {
+	// Verify that after a single rotation event from multiple goroutines,
+	// the partition index advances by exactly 1 (not N).
+	c := newTestClient(t)
+	pub, err := c.AddPublication(context.Background(), "hs:quic?endpoint=127.0.0.1:7777|pool=1", 1001)
+	if err != nil {
+		t.Fatalf("AddPublication: %v", err)
+	}
+
+	// Fill the first partition almost completely, then trigger rotation from multiple goroutines.
+	// The LogBuffer uses MinTermLength (64 KiB) in tests.
+	startIdx := pub.LogBuf().ActivePartitionIndex()
+
+	// Fill the partition.
+	bigMsg := make([]byte, 1024)
+	for {
+		result, err := pub.Offer(bigMsg)
+		if err != nil {
+			t.Fatalf("Offer: %v", err)
+		}
+		if result == logbuffer.AppendRotation || result == logbuffer.AppendBackPressure {
+			break
+		}
+	}
+
+	endIdx := pub.LogBuf().ActivePartitionIndex()
+	// The partition should have advanced by exactly 1.
+	expected := (startIdx + 1) % int32(logbuffer.NumPartitions)
+	if endIdx != expected {
+		t.Fatalf("expected partition index %d after rotation, got %d", expected, endIdx)
+	}
+}

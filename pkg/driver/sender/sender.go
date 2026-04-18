@@ -5,6 +5,7 @@ package sender
 import (
 	"context"
 	"log/slog"
+	"sync"
 
 	atomicbuf "github.com/cloud-jumpgate/hyperspace/internal/atomic"
 	"github.com/cloud-jumpgate/hyperspace/pkg/driver/conductor"
@@ -20,11 +21,14 @@ const fragmentsPerBatch = 32
 // Sender is the outbound data plane agent.
 type Sender struct {
 	conductor *conductor.Conductor
-	pools     map[string]*pool.Pool // peer → pool
+	pools     map[string]*pool.Pool // peer -> pool
 	arb       arbitrator.Arbitrator
 	mtu       int // max payload per QUIC write (default 1200)
 	// per-publication send position tracking
-	positions map[int64]int64 // publicationID → log position (as nextOffset from reader)
+	positions map[int64]int64 // publicationID -> log position (as nextOffset from reader)
+	// framePool provides reusable byte buffers for frame serialization (P-01 fix).
+	// Eliminates make([]byte, frameLen) allocation on every send.
+	framePool sync.Pool
 }
 
 // New creates a Sender.
@@ -32,12 +36,19 @@ func New(cond *conductor.Conductor, arb arbitrator.Arbitrator, mtu int) *Sender 
 	if mtu <= 0 {
 		mtu = 1200
 	}
+	maxFrameSize := mtu + logbuffer.HeaderLength
 	return &Sender{
 		conductor: cond,
 		pools:     make(map[string]*pool.Pool),
 		arb:       arb,
 		mtu:       mtu,
 		positions: make(map[int64]int64),
+		framePool: sync.Pool{
+			New: func() any {
+				buf := make([]byte, maxFrameSize)
+				return &buf
+			},
+		},
 	}
 }
 
@@ -110,8 +121,10 @@ func (s *Sender) sendPublication(_ context.Context, pub *conductor.PublicationSt
 			return
 		}
 
-		// Build frame bytes (full frame: header + payload).
-		frameBytes := make([]byte, frameLen)
+		// Build frame bytes using pooled buffer (P-01 fix).
+		// Get a reusable buffer from the pool to avoid allocation per frame.
+		bufPtr := s.framePool.Get().(*[]byte)
+		frameBytes := (*bufPtr)[:frameLen]
 		buf.GetBytes(offset, frameBytes)
 
 		streamID := uint64(hdr.StreamID())
@@ -120,6 +133,7 @@ func (s *Sender) sendPublication(_ context.Context, pub *conductor.PublicationSt
 		}
 
 		if sendErr := conn.Send(streamID, frameBytes); sendErr != nil {
+			s.framePool.Put(bufPtr)
 			slog.Warn("sender: failed to send frame",
 				"publication_id", pub.PublicationID,
 				"stream_id", streamID,
@@ -127,6 +141,8 @@ func (s *Sender) sendPublication(_ context.Context, pub *conductor.PublicationSt
 			)
 			return
 		}
+		// Return buffer to pool after successful send.
+		s.framePool.Put(bufPtr)
 		totalSent++
 	}, termOffset, fragmentsPerBatch)
 

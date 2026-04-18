@@ -153,6 +153,111 @@ func TestRunAgent_BothIdleAndResetCalledOnMixedWork(t *testing.T) {
 	}
 }
 
+// --- Panic recovery tests (A-01 / F-018) ---
+
+// panickingAgent panics on the first N calls to DoWork, then works normally.
+type panickingAgent struct {
+	name        string
+	panicCount  int // how many times to panic
+	callCount   atomic.Int64
+	workResult  int
+}
+
+func (p *panickingAgent) DoWork(_ context.Context) int {
+	n := p.callCount.Add(1)
+	if int(n) <= p.panicCount {
+		panic("test panic")
+	}
+	return p.workResult
+}
+
+func (p *panickingAgent) Name() string  { return p.name }
+func (p *panickingAgent) Close() error { return nil }
+
+func TestRunAgent_RecoversPanic(t *testing.T) {
+	// Agent panics once, then works normally. Should survive the panic.
+	agent := &panickingAgent{name: "panic-once", panicCount: 1, workResult: 0}
+	idle := &mockIdle{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	var counter atomic.Int64
+	cfg := driver.AgentRunConfig{
+		PanicThreshold: 10,
+		PanicCounter:   &counter,
+	}
+
+	driver.RunAgentWithConfig(ctx, agent, idle, cfg)
+
+	// Agent should have been called more than once (survived the panic).
+	if agent.callCount.Load() < 2 {
+		t.Fatalf("expected agent to be called at least twice (survived panic), got %d", agent.callCount.Load())
+	}
+	// Panic counter should be 1.
+	if counter.Load() != 1 {
+		t.Fatalf("expected panic counter = 1, got %d", counter.Load())
+	}
+}
+
+func TestRunAgent_PanicCounter_ExceedsThreshold_Stops(t *testing.T) {
+	// Agent panics on every call. Should stop after threshold.
+	threshold := 3
+	agent := &panickingAgent{name: "always-panic", panicCount: 1000, workResult: 0}
+	idle := &mockIdle{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var counter atomic.Int64
+	cfg := driver.AgentRunConfig{
+		PanicThreshold: threshold,
+		PanicCounter:   &counter,
+	}
+
+	done := make(chan struct{})
+	go func() {
+		driver.RunAgentWithConfig(ctx, agent, idle, cfg)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Agent should have stopped due to panic threshold.
+	case <-time.After(2 * time.Second):
+		t.Fatal("RunAgent did not stop after panic threshold exceeded")
+	}
+
+	if counter.Load() != int64(threshold) {
+		t.Fatalf("expected panic counter = %d, got %d", threshold, counter.Load())
+	}
+}
+
+func TestRunAgent_NoPanic_NoOverhead(t *testing.T) {
+	// Agent never panics. Counter should stay at 0.
+	agent := &mockAgent{name: "no-panic"}
+	agent.workResult.Store(0)
+	idle := &mockIdle{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	var counter atomic.Int64
+	cfg := driver.AgentRunConfig{
+		PanicThreshold: 10,
+		PanicCounter:   &counter,
+	}
+
+	driver.RunAgentWithConfig(ctx, agent, idle, cfg)
+
+	if counter.Load() != 0 {
+		t.Fatalf("expected panic counter = 0, got %d", counter.Load())
+	}
+	if agent.doWorkCount.Load() == 0 {
+		t.Fatal("expected DoWork to be called at least once")
+	}
+}
+
 // --- IdleStrategy interface compliance tests ---
 
 func TestBusySpinIdle_SatisfiesInterface(t *testing.T) {

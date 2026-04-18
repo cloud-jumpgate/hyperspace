@@ -101,6 +101,13 @@ func (lb *LogBuffer) SetActivePartitionIndex(idx int32) {
 	lb.metaBuf.PutInt32Ordered(metaOffActivePartitionIdx, idx)
 }
 
+// CompareAndSwapActivePartitionIndex atomically sets the active partition index
+// from expected to desired. Returns true if the swap succeeded.
+// This is used by Publication.Offer for safe concurrent term rotation (C-01 fix).
+func (lb *LogBuffer) CompareAndSwapActivePartitionIndex(expected, desired int32) bool {
+	return lb.metaBuf.CompareAndSetInt32(metaOffActivePartitionIdx, expected, desired)
+}
+
 // InitialTermID returns the initial_term_id stored in meta.
 func (lb *LogBuffer) InitialTermID() int32 {
 	return lb.metaBuf.GetInt32LE(metaOffInitialTermID)
