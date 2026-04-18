@@ -1,9 +1,9 @@
 # Harness Quality Report — Hyperspace
 
 **Version:** 1.0
-**Report Date:** 2026-04-17 (updated S11: 2026-04-17)
+**Report Date:** 2026-04-18 (updated S12: 2026-04-18)
 **Evaluator:** Harness Evaluator (CTO-directed alignment session)
-**Sprint Coverage:** S1 through S11
+**Sprint Coverage:** S1 through S12
 **Overall Verdict:** PASS
 
 ---
@@ -117,6 +117,27 @@ This report issues a CONDITIONAL PASS to unblock governance alignment work. The 
 | F-019 | Image Map TTL Eviction (S-01) | PASS | 92% |
 
 **Satisfaction Score:** 5/5 = 1.00 (PASS)
+
+---
+
+## Sprint S12 -- Fault Tolerance + CC Wiring (Evaluator Verdict: PASS)
+
+**Date:** 2026-04-18 | **PR:** #10 | **Test Suite:** all 38 packages pass, zero races
+
+| Feature ID | Feature Name | Verdict | Coverage |
+|---|---|---|---|
+| F-020 | Pool Reconnection Logic (A-02) | PASS | 96% |
+| F-021 | CC Algorithm Adapter (F-03) | PASS | 90% |
+| F-022 | Sender Position Term-Aware Tracking (S-03) | PASS | 90% |
+| F-023 | Composite Session Key (C-02) | PASS | 92% |
+
+**Satisfaction Score:** 4/4 = 1.00 (PASS)
+
+**Notes:**
+- Pool health check leverages pool's built-in `pruneClosedLocked()` for closed-connection removal; health check's primary value is the reconnection-with-backoff logic.
+- CC adapter correctly falls back to CUBIC for unknown algorithm names.
+- Sender position reset on partition change verified with term rotation integration test.
+- Composite key eliminates birthday collision risk across streams sharing a sessionID.
 
 ---
 
