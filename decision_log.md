@@ -20,6 +20,8 @@
 | ADR-010 | Inbound TLS and SPIFFE ID validation on Accept | Accepted | 2026-04-18 | CTO |
 | ADR-011 | Frame header canonical size: 32 bytes | Accepted | 2026-04-18 | CTO |
 | ADR-012 | TLS MinVersion=0 must be rejected explicitly | Accepted | 2026-04-18 | CTO |
+| ADR-013 | Adaptive Pool Learner: Saturation/Spread Heuristic vs RTT Projection Model | Accepted | 2026-04-19 | CTO |
+| ADR-014 | Sender Frame Drop vs Hold-and-Retry on Empty Connection Pool | Accepted | 2026-04-19 | CTO |
 
 ---
 
@@ -526,3 +528,71 @@ A panic (not an error return) is appropriate because this is a programmer error 
 #### Review Trigger
 
 Re-evaluate if Go changes the default TLS minimum version to 1.3 or higher.
+
+---
+
+### ADR-013: Adaptive Pool Learner — Saturation/Spread Heuristic vs RTT Projection Model
+
+**Date:** 2026-04-19
+**Status:** Accepted
+**Author:** CTO (S16 Code Evaluator finding)
+**Supersedes:** F007-F02/F03 in sprint_contracts/S5.md
+
+#### Context
+
+The S5 sprint contract specified a pool learner policy based on:
+- **Add**: when mean RTT improves by >10% for pool+1 vs current pool (using probe history)
+- **Remove**: when loss rate <0.1% AND all connections show no RTT improvement for >60s
+
+The implementing agent instead used the design document §8.4 heuristic:
+- **Add**: when aggregate cwnd saturation exceeds 80% (all connections inflight > 0.8 * cwnd)
+- **Remove**: when RTT spread is high (best RTT < 0.5 × worst RTT) OR correlated loss (all connections > 5% loss rate)
+- **Hold**: otherwise
+
+#### Decision
+
+The design document §8.4 heuristic is adopted as the canonical policy. Reasons:
+
+1. **Implementability**: The RTT projection model requires a counterfactual estimate (RTT for pool+1) which is unavailable without adding a test connection. The saturation/spread heuristic uses only currently observable metrics.
+2. **Reactivity**: The saturation signal reacts within one evaluation cycle (default 5s) when demand exceeds capacity. The RTT projection model requires historical trending.
+3. **Safety**: The correlated-loss Remove trigger prevents over-pooling under packet loss. The 60-second RTT stability threshold in the contract would create 60s lag on Remove decisions.
+
+#### Consequences
+
+- The S5 sprint contract criterion F007-F02/F03 is superseded by this ADR.
+- `sprint_contracts/S5.md` policy description should reference §8.4 heuristic.
+- `PoolSizeRecommendation` struct (with `Reason string` and `TargetSize int` fields) remains a future enhancement (deferred to a later sprint) to improve observability of learner decisions.
+- The Code Evaluator CONDITIONAL PASS on F-007 is resolved: implementation complies with ADR-013.
+
+#### Review Trigger
+
+Re-evaluate if probe history accumulation is implemented and a counterfactual RTT projection becomes feasible without adding live test connections.
+
+---
+
+### ADR-014: Sender Frame Drop vs Hold-and-Retry on Empty Connection Pool
+
+**Date:** 2026-04-19
+**Status:** Accepted
+**Author:** CTO (S16 Code Evaluator finding DEF-007)
+**Supersedes:** F008-S05 in sprint_contracts/S3.md
+
+#### Context
+
+Sprint contract F008-S05 specified: when the Arbitrator returns ErrNoConnections (no connections available), the Sender should NOT drop frames — it should hold and retry.
+
+The implementation drops the frame, counts it as a LostFrame (via the CtrLostFrames counter), and signals back-pressure to the Publication via the back-pressure flag.
+
+#### Decision
+
+The drop-with-back-pressure pattern is accepted. The Publication's Offer method returns AppendBackPressure (-1) when back-pressure is signalled, giving the client application the opportunity to retry. This is equivalent to the Aeron media driver model: the driver signals back-pressure to the publisher rather than buffering indefinitely at the transport layer.
+
+#### Consequences
+
+- F008-S05 criterion is superseded by this ADR.
+- Applications using `Publication.Offer` must handle `AppendBackPressure` return values and implement retry at the application layer.
+- The sprint contract S3.md should be annotated with a reference to this ADR.
+
+#### Review Trigger
+
+Re-evaluate if benchmarks show that application-layer retry introduces unacceptable latency spikes compared to a bounded in-driver retry buffer.
