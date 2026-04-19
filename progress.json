@@ -331,7 +331,7 @@
       "code_evaluator_verdict": "PASS",
       "security_evaluator_verdict": null,
       "coverage_pct": 85,
-      "pr_number": null,
+      "pr_number": 12,
       "notes": "ADR-007: DRL fallback changed from CUBIC to BBRv3. TestFallbackIsBBRv3 verifies."
     },
     {
@@ -342,7 +342,7 @@
       "code_evaluator_verdict": "PASS",
       "security_evaluator_verdict": "PASS",
       "coverage_pct": 85,
-      "pr_number": null,
+      "pr_number": 12,
       "notes": "ADR-008: SPIFFESource.StartWatch() with atomic TLS config rotation. 5 new tests."
     },
     {
@@ -353,7 +353,7 @@
       "code_evaluator_verdict": "PASS",
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
-      "pr_number": null,
+      "pr_number": 12,
       "notes": "ADR-009: 3-attempt retry with connection removal, LostFrames counter, back-pressure flag. 4 new tests."
     },
     {
@@ -364,7 +364,7 @@
       "code_evaluator_verdict": "PASS",
       "security_evaluator_verdict": "PASS",
       "coverage_pct": 90,
-      "pr_number": null,
+      "pr_number": 12,
       "notes": "ADR-010: Accept() validates HandshakeComplete, PeerCertificates, optional SPIFFE URI SAN. 4 new tests."
     },
     {
@@ -375,7 +375,7 @@
       "code_evaluator_verdict": "PASS",
       "security_evaluator_verdict": "PASS",
       "coverage_pct": 90,
-      "pr_number": null,
+      "pr_number": 12,
       "notes": "ADR-012: validateTLSConfig panics on MinVersion==0 to prevent TLS 1.2 downgrade. 1 new test."
     },
     {
@@ -386,7 +386,7 @@
       "code_evaluator_verdict": "PASS",
       "security_evaluator_verdict": null,
       "coverage_pct": null,
-      "pr_number": null,
+      "pr_number": 12,
       "notes": "ADR-011: SPEC.md F-001 updated to 32-byte canonical layout with all 8 fields. Documentation-only."
     }
   ],

@@ -1,10 +1,10 @@
 # Harness Quality Report — Hyperspace
 
-**Version:** 1.0
-**Report Date:** 2026-04-18 (updated S13: 2026-04-18)
-**Evaluator:** Harness Evaluator (CTO-directed alignment session)
-**Sprint Coverage:** S1 through S13
-**Overall Verdict:** PASS
+**Version:** 2.0
+**Report Date:** 2026-04-18 (updated: 2026-04-17 full audit S11-S14)
+**Evaluator:** Harness Evaluator (CTO-directed full compliance audit)
+**Sprint Coverage:** S1 through S14
+**Overall Verdict:** CONDITIONAL PASS
 
 ---
 
@@ -201,3 +201,182 @@ This report issues a CONDITIONAL PASS to unblock governance alignment work. The 
 - F-033: `Accept()` validates HandshakeComplete, PeerCertificates non-empty, and optionally SPIFFE URI SAN. 3 new error sentinels. 4 new tests.
 - F-034: `validateTLSConfig()` panics on `MinVersion == 0` to prevent silent TLS 1.2 downgrade. 1 new test.
 - F-035: SPEC.md frame header section updated from 24 to 32 bytes with all 8 fields documented.
+
+---
+
+---
+
+## Full Compliance Audit: Sprints S11, S12, S13, S14
+
+**Audit Date:** 2026-04-17
+**Auditor:** Harness Evaluator (invoked by CTO)
+**Scope:** All v2.0 framework rules, HARD STOPS, PRE-SPRINT GATE, ENFORCEMENT CHECKLIST, Quality Gates
+
+---
+
+### Per-Sprint Verdict Table
+
+| Sprint | Contract | Doc Deliverables | progress.json | Telemetry Events | Session Artefacts | CI Status | Verdict |
+|---|---|---|---|---|---|---|---|
+| S11 | PASS | PASS | PASS | PASS | PASS | FAIL (gosec) | CONDITIONAL PASS |
+| S12 | PASS | PASS | PASS | PASS | PASS | FAIL (gosec) | CONDITIONAL PASS |
+| S13 | PASS (v1.0) | PASS | PASS | PASS | PASS | FAIL (gosec) | CONDITIONAL PASS |
+| S14 | CONDITIONAL | PASS | PASS (no PR#) | PASS | PASS | FAIL (gosec) | CONDITIONAL PASS |
+
+**Overall Audit Verdict: CONDITIONAL PASS**
+
+---
+
+### Finding 1: All CI Runs Failing -- gosec Security Scan (CRITICAL)
+
+**Severity:** Critical
+**Affects:** S11, S12, S13, S14
+
+All 15 most recent CI runs show `conclusion: failure`. The failure is isolated to the "Security scan" job (`gosec`), which reports 87 issues (all G104/CWE-703: unhandled errors, severity LOW). Lint, Test, Build, and Vulnerability Scan jobs all pass.
+
+Per Quality Gates: `gosec ./... zero high-severity findings` is a PR merge gate. The findings are LOW severity (unchecked `f.Close()` and `w.Flush()` return values), which is arguably not a high-severity block. However, the CI job is configured to fail on any gosec finding, meaning the gate as implemented is stricter than the documented policy.
+
+**Impact:** All 4 PRs (#9, #10, #11, #12) were merged with failing CI. This is a governance violation -- the CI gate was not enforced at merge time.
+
+**Required Action:** Either fix the 87 gosec findings (preferred) or adjust the CI gosec invocation to only fail on HIGH/MEDIUM severity per the documented policy.
+
+---
+
+### Finding 2: PR Template Not Followed (HIGH)
+
+**Severity:** High
+**Affects:** PRs #9, #10, #11, #12
+
+`.github/PULL_REQUEST_TEMPLATE.md` defines a structured template with sections for Sprint/Feature, Evaluator Sign-off checkboxes, Session Artefacts Updated checkboxes, Quality Gates checkboxes, and Documentation Deliverables checkboxes. None of the four PRs follow this template. All four use a free-form Summary/Test Plan format instead.
+
+**Impact:** The PR template was created during the governance remediation session but was never used for any actual PR. The Evaluator Sign-off checkboxes and Session Artefacts checkboxes -- which are the primary traceability mechanism -- were never checked.
+
+**Required Action:** Future PRs must use the template. Retroactive fix is not required, but this is a recurring gap.
+
+---
+
+### Finding 3: S14 Sprint Contract Harness Evaluator Sign-Off Incomplete (MEDIUM)
+
+**Severity:** Medium
+**Affects:** S14
+
+The S14 sprint contract sign-off table shows `Harness Evaluator: Pending`. All other sprint contracts (S11, S12, S13) show `Harness Evaluator: APPROVED`. This means S14 implementation may have started without the formal Harness Evaluator kickoff check.
+
+Per HARD STOP #2: "If HARNESS_QUALITY_REPORT.md does not exist or contains a FAIL verdict for the prior sprint, STOP." The report existed and contained PASS for S13, so the hard stop was technically not triggered. But the sprint contract itself was not countersigned by the evaluator.
+
+**Impact:** Minor procedural gap. The CTO authorised the sprint directly, which is within authority.
+
+---
+
+### Finding 4: S14 Features Missing PR Numbers in progress.json (LOW)
+
+**Severity:** Low
+**Affects:** S14
+
+Features F-030 through F-035 in `progress.json` all have `pr_number: null`, despite PR #12 being merged. The schema rules state "pr_number should be set when a PR is opened for this feature."
+
+**Required Action:** Update progress.json to set `pr_number: 12` for F-030 through F-035.
+
+---
+
+### Finding 5: S13 Sprint Contract Version 1.0, Not 2.0 (LOW)
+
+**Severity:** Low
+**Affects:** S13
+
+The S13 sprint contract header shows `Version: 1.0` while S11 and S12 show `Version: 2.0`. The content is conformant (has Documentation Deliverables section, sign-off table, acceptance criteria), so this is a cosmetic inconsistency only.
+
+---
+
+### Finding 6: F-001 through F-014 Still Without Code Evaluator Verdicts (CRITICAL -- INHERITED)
+
+**Severity:** Critical (inherited from prior audit)
+**Affects:** S1-S10
+
+14 features from sprints S1-S10 remain at `code_complete` with `code_evaluator_verdict: null`. These features were never independently evaluated. This was flagged in the original HARNESS_QUALITY_REPORT.md as Violation #8 (OPEN).
+
+Per HARD STOP #5: Features must not be marked `evaluator_pass` without a Code Evaluator PASS verdict. These features are correctly NOT marked `evaluator_pass` -- they remain at `code_complete`. No HARD STOP violation.
+
+However, per Quality Gates: "Code Evaluator PASS blocks Feature marked passing." These 14 features are effectively in limbo -- implemented, tested, but never formally approved.
+
+**Required Action:** Invoke Code Evaluator for at least the P0 features (F-001, F-002, F-003, F-008, F-010, F-014). This has been an open action since the original audit.
+
+---
+
+### Finding 7: F-013 and F-014 Still Without Security Evaluator Verdicts (CRITICAL -- INHERITED)
+
+**Severity:** Critical (inherited from prior audit)
+**Affects:** S9
+
+F-013 (AWS Integration) and F-014 (SPIFFE/SPIRE Identity) require Security Evaluator review per Quality Gates but have `security_evaluator_verdict: null`. This was flagged as Violation #9 (OPEN) in the original audit.
+
+Note: S14 features F-031, F-033, F-034 have received Security Evaluator PASS, which partially addresses the security evaluation gap. But F-013 and F-014 remain open.
+
+**Required Action:** Invoke Security Evaluator for F-013 and F-014.
+
+---
+
+### HARD STOP Violation Analysis
+
+| HARD STOP | Description | S11 | S12 | S13 | S14 |
+|---|---|---|---|---|---|
+| #1 | Sprint started without contract | NO | NO | NO | NO |
+| #2 | Harness Evaluator not PASS | NO | NO | NO | MINOR (pending sign-off) |
+| #3 | Baseline tests not green | NO | NO | NO | NO |
+| #4 | Session state missing | NO | NO | NO | NO |
+| #5 | Feature marked evaluator_pass without verdict | NO | NO | NO | NO |
+| #6 | Sprint-level progress.json | NO | NO | NO | NO |
+| #7 | Session closed without artefact update | NO | NO | NO | NO |
+| #8 | External services in tests | NO | NO | NO | NO |
+| #9 | CGO outside permitted packages | NO | NO | NO | NO |
+| #10 | Contract missing doc deliverables | NO | NO | NO | NO |
+
+**Result: Zero HARD STOP violations across all four sprints.**
+
+---
+
+### init.sh Gate Simulation
+
+Would `./init.sh S14` have passed at the start of S14?
+
+| Gate | Result | Notes |
+|---|---|---|
+| Sprint contract exists | PASS | `sprint_contracts/S14.md` exists and is non-empty |
+| Harness verdict acceptable | PASS | HARNESS_QUALITY_REPORT.md contains "PASS" |
+| Baseline tests green | PASS | 38 packages pass, zero races |
+| session_state.json exists | PASS | Present and current |
+| progress.json feature-level | PASS | 35 features tracked |
+| harness_telemetry.jsonl exists | PASS | Present with events |
+| sprint_start event logged | PASS | S14 sprint_start event present |
+
+**Result: init.sh would have PASSED for all four sprints.**
+
+---
+
+### Implementation Spot-Check Results
+
+| Sprint | File | Feature | Verified | Notes |
+|---|---|---|---|---|
+| S11 | pkg/driver/receiver/receiver.go | Complete frame header | YES | All header fields written |
+| S11 | pkg/driver/agent.go | Panic recovery | YES | `recover()` present with counter |
+| S11 | pkg/driver/sender/sender.go | sync.Pool | YES | `framePool sync.Pool` declared and used |
+| S12 | pkg/driver/poolmgr/poolmgr.go | Reconnection | YES | `healthCheck` with exponential backoff |
+| S12 | pkg/cc/adapter.go | CC wiring | YES | File exists and compiles |
+| S12 | pkg/driver/sender/sender.go | Term-aware position | YES | (verified via evaluator notes) |
+| S13 | pkg/transport/ | Connection interface | PARTIAL | No `connection.go` at transport root; interface is in `pkg/transport/quic/conn.go` |
+| S13 | pkg/driver/conductor/conductor.go | atomic.Pointer | YES | `pubSnap` and `subSnap` use `syncatomic.Pointer` |
+| S13 | pkg/client/client.go | Adaptive backoff | YES | (verified via evaluator notes) |
+| S14 | pkg/cc/drl/drl.go | BBRv3 fallback | YES | Imports `bbrv3`, not `cubic` |
+| S14 | pkg/identity/identity.go | WatchX509Context | YES | `StartWatch` with `atomic.Pointer[tls.Config]` |
+| S14 | pkg/transport/quic/conn.go | Accept validation | YES | HandshakeComplete, PeerCertificates, RequireSPIFFE checks present |
+| S14 | pkg/transport/quic/conn.go | MinVersion=0 panic | YES | `tlsConf.MinVersion == 0` panic present |
+
+---
+
+### Conditions for Full PASS
+
+1. **Fix CI gosec failures.** Either resolve the 87 low-severity gosec findings or adjust CI to match the documented policy (fail on HIGH severity only). All PRs were merged with failing CI.
+2. **Invoke Code Evaluator for F-001 through F-014.** 14 features remain at `code_complete` with no evaluator verdict. This has been an open item since the original audit.
+3. **Invoke Security Evaluator for F-013 and F-014.** AWS and SPIFFE/SPIRE features require security review.
+4. **Update progress.json** to set `pr_number: 12` for F-030 through F-035.
+5. **Enforce PR template usage** for all future PRs.
