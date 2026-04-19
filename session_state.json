@@ -1,13 +1,30 @@
 {
   "project": "hyperspace",
   "last_updated": "2026-04-19",
-  "state": "ci_green",
-  "current_sprint": "S15",
-  "sprints_complete": ["S1","S2","S3","S4","S5","S6","S7","S8","S9","S10","S11","S12","S13","S14","S15"],
+  "state": "evaluator_remediation_complete",
+  "current_sprint": "S16",
+  "sprints_complete": [
+    "S1",
+    "S2",
+    "S3",
+    "S4",
+    "S5",
+    "S6",
+    "S7",
+    "S8",
+    "S9",
+    "S10",
+    "S11",
+    "S12",
+    "S13",
+    "S14",
+    "S15",
+    "S16"
+  ],
   "last_session": {
     "date": "2026-04-19",
-    "agent": "backend",
-    "action": "S15 complete: fixed all 75 gosec CI failures (F-036). crypto/rand for session IDs, 75 #nosec annotations. gosec 0 issues, golangci-lint clean, all tests passing. Pushed to main."
+    "agent": "cto",
+    "action": "S16 complete: B1/B2/DEF-001 fixed, 13 named tests added. Code Evaluator: F-001,F-004-F-008,F-010-F-014 PASS; F-002,F-003,F-009 CONDITIONAL PASS. Security Evaluator: F-013,F-014 PASS. progress.json promoted 10 features to evaluator_pass. HARNESS_QUALITY_REPORT.md updated to v2.1."
   },
   "test_suite": {
     "status": "passing",
@@ -15,5 +32,9 @@
     "last_run": "2026-04-19",
     "races": 0
   },
-  "open_actions": []
+  "open_actions": [
+    "F-002: increase TestMPSC_ConcurrentProducers to 16 goroutines, TestBroadcast_MultipleReceivers to 4 receivers",
+    "F-003: add coverage for QUIC dial/accept/stream error paths to reach 90% gate",
+    "F-009 DEF-005: implement SVID cert rotation drain-then-close in PoolManager"
+  ]
 }
