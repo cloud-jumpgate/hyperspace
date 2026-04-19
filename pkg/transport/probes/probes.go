@@ -66,7 +66,7 @@ func DecodePing(src []byte) (*PingFrame, error) {
 		return nil, fmt.Errorf("%w: got 0x%02x, want 0x%02x", ErrWrongFrameType, src[0], FramePING)
 	}
 	seq := binary.LittleEndian.Uint64(src[1:9])
-	sentNs := int64(binary.LittleEndian.Uint64(src[9:17]))
+	sentNs := int64(binary.LittleEndian.Uint64(src[9:17])) // #nosec G115 -- probe wire format: uint64 nanosecond timestamp reinterpreted as int64 (time.Unix requires int64)
 	return &PingFrame{
 		Seq:    seq,
 		SentAt: time.Unix(0, sentNs).UTC(),
@@ -85,8 +85,8 @@ func EncodePong(dst []byte, ping *PingFrame, receivedAt time.Time) error {
 	}
 	dst[0] = FramePONG
 	binary.LittleEndian.PutUint64(dst[1:9], ping.Seq)
-	binary.LittleEndian.PutUint64(dst[9:17], uint64(ping.SentAt.UnixNano()))
-	binary.LittleEndian.PutUint64(dst[17:25], uint64(receivedAt.UnixNano()))
+	binary.LittleEndian.PutUint64(dst[9:17], uint64(ping.SentAt.UnixNano())) // #nosec G115 -- probe wire format: int64 nanosecond timestamp to uint64 binary encoding
+	binary.LittleEndian.PutUint64(dst[17:25], uint64(receivedAt.UnixNano())) // #nosec G115 -- probe wire format: int64 nanosecond timestamp to uint64 binary encoding
 	return nil
 }
 
@@ -99,8 +99,8 @@ func DecodePong(src []byte) (*PongFrame, error) {
 		return nil, fmt.Errorf("%w: got 0x%02x, want 0x%02x", ErrWrongFrameType, src[0], FramePONG)
 	}
 	seq := binary.LittleEndian.Uint64(src[1:9])
-	sentNs := int64(binary.LittleEndian.Uint64(src[9:17]))
-	recvNs := int64(binary.LittleEndian.Uint64(src[17:25]))
+	sentNs := int64(binary.LittleEndian.Uint64(src[9:17]))  // #nosec G115 -- probe wire format: uint64 bytes reinterpreted as int64 nanosecond timestamp
+	recvNs := int64(binary.LittleEndian.Uint64(src[17:25])) // #nosec G115 -- probe wire format: uint64 bytes reinterpreted as int64 nanosecond timestamp
 	return &PongFrame{
 		Seq:        seq,
 		SentAt:     time.Unix(0, sentNs).UTC(),

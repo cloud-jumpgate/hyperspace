@@ -5,9 +5,9 @@ package conductor
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/binary"
 	"log/slog"
-	"math/rand"
 	"sync"
 	syncatomic "sync/atomic"
 	"time"
@@ -81,7 +81,6 @@ type Conductor struct {
 	termLength      int
 	maxCmdsPerCycle int                 // F-02 fix: configurable max commands per DoWork
 	clientAlive     map[int64]time.Time // correlationID → last keepalive time
-	rng             *rand.Rand
 	// Lock-free publication/subscription snapshots (P-03 fix).
 	pubSnap syncatomic.Pointer[[]*PublicationState]
 	subSnap syncatomic.Pointer[[]*SubscriptionState]
@@ -109,7 +108,6 @@ func New(toDriverBuf, fromDriverBuf *atomic.AtomicBuffer, termLength int) (*Cond
 		clientAlive:     make(map[int64]time.Time),
 		termLength:      termLength,
 		maxCmdsPerCycle: DefaultMaxCommandsPerCycle,
-		rng:             rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec
 	}
 	// Initialise lock-free snapshots (P-03 fix).
 	emptyPubs := make([]*PublicationState, 0)
@@ -260,7 +258,13 @@ func (c *Conductor) handleAddPublication(buf *atomic.AtomicBuffer, offset, lengt
 		return
 	}
 
-	sessionID := c.rng.Int31() //nolint:gosec
+	var sessionIDBytes [4]byte
+	if _, err := cryptorand.Read(sessionIDBytes[:]); err != nil {
+		slog.Error("conductor: failed to generate session ID", "error", err)
+		c.broadcastError(correlationID, "internal error: session ID generation failed")
+		return
+	}
+	sessionID := int32(binary.LittleEndian.Uint32(sessionIDBytes[:])) // #nosec G115 -- crypto/rand bytes reinterpreted as int32; bit-pattern conversion is intentional for session ID
 	pub := &PublicationState{
 		PublicationID: correlationID,
 		SessionID:     sessionID,
@@ -379,9 +383,9 @@ func (c *Conductor) handleClientKeepalive(buf *atomic.AtomicBuffer, offset, leng
 // Payload: correlationID(8) + sessionID(4) + streamID(4) = 16 bytes.
 func (c *Conductor) broadcastPublicationReady(correlationID int64, sessionID, streamID int32) {
 	payload := make([]byte, 16)
-	binary.LittleEndian.PutUint64(payload[0:], uint64(correlationID))
-	binary.LittleEndian.PutUint32(payload[8:], uint32(sessionID))
-	binary.LittleEndian.PutUint32(payload[12:], uint32(streamID))
+	binary.LittleEndian.PutUint64(payload[0:], uint64(correlationID)) // #nosec G115 -- protocol wire format: int64 correlationID to uint64 binary encoding
+	binary.LittleEndian.PutUint32(payload[8:], uint32(sessionID))     // #nosec G115 -- protocol wire format: int32 sessionID to uint32 binary encoding
+	binary.LittleEndian.PutUint32(payload[12:], uint32(streamID))     // #nosec G115 -- protocol wire format: int32 streamID to uint32 binary encoding
 	if err := c.fromDriverTx.Transmit(RspPublicationReady, payload); err != nil {
 		slog.Error("conductor: failed to broadcast publication ready", "error", err)
 	}
@@ -391,8 +395,8 @@ func (c *Conductor) broadcastPublicationReady(correlationID int64, sessionID, st
 // Payload: correlationID(8) + streamID(4) = 12 bytes.
 func (c *Conductor) broadcastSubscriptionReady(correlationID int64, streamID int32) {
 	payload := make([]byte, 12)
-	binary.LittleEndian.PutUint64(payload[0:], uint64(correlationID))
-	binary.LittleEndian.PutUint32(payload[8:], uint32(streamID))
+	binary.LittleEndian.PutUint64(payload[0:], uint64(correlationID)) // #nosec G115 -- protocol wire format: int64 correlationID to uint64 binary encoding
+	binary.LittleEndian.PutUint32(payload[8:], uint32(streamID))      // #nosec G115 -- protocol wire format: int32 streamID to uint32 binary encoding
 	if err := c.fromDriverTx.Transmit(RspSubscriptionReady, payload); err != nil {
 		slog.Error("conductor: failed to broadcast subscription ready", "error", err)
 	}
@@ -402,7 +406,7 @@ func (c *Conductor) broadcastSubscriptionReady(correlationID int64, streamID int
 func (c *Conductor) broadcastError(correlationID int64, msg string) {
 	msgBytes := []byte(msg)
 	payload := make([]byte, 8+len(msgBytes))
-	binary.LittleEndian.PutUint64(payload[0:], uint64(correlationID))
+	binary.LittleEndian.PutUint64(payload[0:], uint64(correlationID)) // #nosec G115 -- protocol wire format: int64 correlationID to uint64 binary encoding
 	copy(payload[8:], msgBytes)
 	if err := c.fromDriverTx.Transmit(RspError, payload); err != nil {
 		slog.Error("conductor: failed to broadcast error", "error", err)

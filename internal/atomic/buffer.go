@@ -130,25 +130,25 @@ func (b *AtomicBuffer) PutBytes(offset int, src []byte) {
 // GetInt32LE reads a little-endian int32 at offset (plain, non-atomic).
 func (b *AtomicBuffer) GetInt32LE(offset int) int32 {
 	b.checkBounds(offset, 4)
-	return int32(binary.LittleEndian.Uint32(b.buf[offset:]))
+	return int32(binary.LittleEndian.Uint32(b.buf[offset:])) // #nosec G115 -- Aeron wire format reinterpret: uint32 bytes to int32 signed representation
 }
 
 // PutInt32LE writes a little-endian int32 at offset (plain, non-atomic).
 func (b *AtomicBuffer) PutInt32LE(offset int, v int32) {
 	b.checkBounds(offset, 4)
-	binary.LittleEndian.PutUint32(b.buf[offset:], uint32(v))
+	binary.LittleEndian.PutUint32(b.buf[offset:], uint32(v)) // #nosec G115 -- Aeron wire format: int32 to uint32 binary encoding, bit pattern preserved
 }
 
 // GetInt64LE reads a little-endian int64 at offset (plain, non-atomic).
 func (b *AtomicBuffer) GetInt64LE(offset int) int64 {
 	b.checkBounds(offset, 8)
-	return int64(binary.LittleEndian.Uint64(b.buf[offset:]))
+	return int64(binary.LittleEndian.Uint64(b.buf[offset:])) // #nosec G115 -- Aeron wire format reinterpret: uint64 bytes to int64 signed representation
 }
 
 // PutInt64LE writes a little-endian int64 at offset (plain, non-atomic).
 func (b *AtomicBuffer) PutInt64LE(offset int, v int64) {
 	b.checkBounds(offset, 8)
-	binary.LittleEndian.PutUint64(b.buf[offset:], uint64(v))
+	binary.LittleEndian.PutUint64(b.buf[offset:], uint64(v)) // #nosec G115 -- Aeron wire format: int64 to uint64 binary encoding, bit pattern preserved
 }
 
 // GetUint8 reads a single byte at offset.

@@ -256,7 +256,7 @@ func (qc *QUICConnection) acceptUniStreams() {
 
 // readUniStream reads all data from a unidirectional stream and pushes to dataIn.
 func (qc *QUICConnection) readUniStream(stream *quic.ReceiveStream) {
-	sid := uint64(stream.StreamID())
+	sid := uint64(stream.StreamID()) // #nosec G115 -- quic-go StreamID() returns int64; QUIC stream IDs are non-negative per RFC 9000, safe to convert to uint64
 	buf := make([]byte, 65536)
 	for {
 		n, err := stream.Read(buf)

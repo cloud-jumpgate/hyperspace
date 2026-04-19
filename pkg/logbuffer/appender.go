@@ -100,7 +100,7 @@ func (a *TermAppender) AppendUnfragmented(
 	termLen := a.termLength()
 
 	rawTail := a.claim(alignedLen)
-	termOffset := int32(rawTail & 0xFFFFFFFF)
+	termOffset := int32(rawTail & 0xFFFFFFFF) // #nosec G115 -- Aeron protocol: lower 32 bits of tail are term offset, bounded by term length
 
 	if int(termOffset)+alignedLen > termLen {
 		// Term is full.  If the tail was already at the limit the term was
@@ -119,7 +119,7 @@ func (a *TermAppender) AppendUnfragmented(
 		a.termBuffer.PutBytes(off+HeaderLength, src)
 	}
 	// Write header fields (frame_length written last — volatile).
-	a.writeHeader(termOffset, int32(frameLen), FlagUnfragmented, FrameTypeDATA,
+	a.writeHeader(termOffset, int32(frameLen), FlagUnfragmented, FrameTypeDATA, // #nosec G115 -- frameLen bounded by MTU, fits in int32
 		sessionID, streamID, termID, reservedValue)
 
 	return rawTail + int64(alignedLen)
@@ -145,7 +145,7 @@ func (a *TermAppender) AppendFragmented(
 		AlignedLength(HeaderLength+lastPayload)
 
 	rawTail := a.claim(totalAligned)
-	termOffset := int32(rawTail & 0xFFFFFFFF)
+	termOffset := int32(rawTail & 0xFFFFFFFF) // #nosec G115 -- Aeron protocol: lower 32 bits of tail are term offset, bounded by term length
 
 	if int(termOffset)+totalAligned > termLen {
 		if int(termOffset) >= termLen {
@@ -181,12 +181,12 @@ func (a *TermAppender) AppendFragmented(
 		a.termBuffer.PutBytes(off+HeaderLength, src[srcPos:srcPos+chunkLen])
 
 		// Write header (frame_length last — volatile).
-		a.writeHeader(currentOffset, int32(HeaderLength+chunkLen), flags, FrameTypeDATA,
+		a.writeHeader(currentOffset, int32(HeaderLength+chunkLen), flags, FrameTypeDATA, // #nosec G115 -- HeaderLength+chunkLen bounded by maxPayloadLength, fits in int32
 			sessionID, streamID, termID, reservedValue)
 
 		srcPos += chunkLen
 		remaining -= chunkLen
-		currentOffset += int32(alignedLen)
+		currentOffset += int32(alignedLen) // #nosec G115 -- alignedLen bounded by maxPayloadLength, fits in int32
 		isFirst = false
 	}
 
@@ -209,5 +209,5 @@ func (a *TermAppender) Padding(termOffset int32, length int) {
 	hdr.SetStreamID(0)
 	hdr.SetTermID(0)
 	hdr.SetReservedValue(0)
-	hdr.SetFrameLength(int32(length))
+	hdr.SetFrameLength(int32(length)) // #nosec G115 -- length is term padding, bounded by term size which fits in int32
 }

@@ -28,7 +28,7 @@ const evictionCheckInterval = 1000
 // compositeKey creates a 64-bit key from (sessionID, streamID) to avoid birthday
 // collisions from rand.Int31() alone (~46K collision threshold). C-02 fix.
 func compositeKey(sessionID, streamID int32) uint64 {
-	return uint64(uint32(sessionID))<<32 | uint64(uint32(streamID))
+	return uint64(uint32(sessionID))<<32 | uint64(uint32(streamID)) // #nosec G115 -- intentional bit-pattern reinterpret of int32 fields into composite uint64 key; no arithmetic overflow risk
 }
 
 // Receiver is the inbound data plane agent.
@@ -148,7 +148,7 @@ func (r *Receiver) RemoveImage(sessionID, streamID int32) {
 // RemoveImageBySessionID removes ALL images for a given sessionID (any streamID).
 // Used when a session is fully torn down.
 func (r *Receiver) RemoveImageBySessionID(sessionID int32) {
-	prefix := uint64(uint32(sessionID)) << 32
+	prefix := uint64(uint32(sessionID)) << 32 // #nosec G115 -- intentional bit-pattern reinterpret of int32 sessionID into uint64 key prefix
 	for key := range r.images {
 		if key>>32 == prefix>>32 {
 			delete(r.images, key)
@@ -173,7 +173,7 @@ func (r *Receiver) processFrame(data []byte) bool {
 	}
 
 	// Validate frame length field against data length.
-	frameLen := int(int32(binary.LittleEndian.Uint32(data[0:])))
+	frameLen := int(int32(binary.LittleEndian.Uint32(data[0:]))) // #nosec G115 -- Aeron wire format: uint32 bytes reinterpreted as signed int32 frame length
 	if frameLen <= 0 || frameLen > len(data) {
 		slog.Warn("receiver: invalid frame length", "frame_len", frameLen, "data_len", len(data))
 		return false
@@ -190,11 +190,11 @@ func (r *Receiver) processFrame(data []byte) bool {
 	version := data[4]
 	flags := data[5]
 	frameType := binary.LittleEndian.Uint16(data[6:])
-	termOffset := int32(binary.LittleEndian.Uint32(data[8:]))
-	sessionID := int32(binary.LittleEndian.Uint32(data[12:]))
-	streamID := int32(binary.LittleEndian.Uint32(data[16:]))
-	termID := int32(binary.LittleEndian.Uint32(data[20:]))
-	reservedValue := int64(binary.LittleEndian.Uint64(data[24:]))
+	termOffset := int32(binary.LittleEndian.Uint32(data[8:]))     // #nosec G115 -- Aeron frame header: uint32 wire bytes reinterpreted as int32 term offset
+	sessionID := int32(binary.LittleEndian.Uint32(data[12:]))     // #nosec G115 -- Aeron frame header: uint32 wire bytes reinterpreted as int32 session ID
+	streamID := int32(binary.LittleEndian.Uint32(data[16:]))      // #nosec G115 -- Aeron frame header: uint32 wire bytes reinterpreted as int32 stream ID
+	termID := int32(binary.LittleEndian.Uint32(data[20:]))        // #nosec G115 -- Aeron frame header: uint32 wire bytes reinterpreted as int32 term ID
+	reservedValue := int64(binary.LittleEndian.Uint64(data[24:])) // #nosec G115 -- Aeron frame header: uint64 wire bytes reinterpreted as int64 reserved value
 
 	if termOffset < 0 {
 		slog.Warn("receiver: negative termOffset", "term_offset", termOffset)
@@ -256,7 +256,7 @@ func (r *Receiver) processFrame(data []byte) bool {
 	hdr.SetReservedValue(reservedValue)
 
 	// Write frameLength LAST as a volatile store to signal readers that the frame is ready.
-	hdr.SetFrameLength(int32(frameLen))
+	hdr.SetFrameLength(int32(frameLen)) // #nosec G115 -- frameLen validated above to be > 0 and <= len(data) which is bounded by MTU
 
 	slog.Debug("receiver: frame written",
 		"session_id", sessionID,

@@ -39,21 +39,21 @@ func Create(path string, size int64) (*MappedFile, error) {
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("memmap.Create: mkdir %s: %w", dir, err)
 	}
 
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600) // #nosec G304 -- operator-controlled path from configuration, not user input
 	if err != nil {
 		return nil, fmt.Errorf("memmap.Create: open %s: %w", path, err)
 	}
 
-	if err := sysFtruncate(int(f.Fd()), size); err != nil {
+	if err := sysFtruncate(int(f.Fd()), size); err != nil { // #nosec G115 -- fd is a valid file descriptor from os.OpenFile
 		f.Close()
 		return nil, fmt.Errorf("memmap.Create: ftruncate %s: %w", path, err)
 	}
 
-	data, err := sysMmap(int(f.Fd()), 0, int(size), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
+	data, err := sysMmap(int(f.Fd()), 0, int(size), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED) // #nosec G115 -- fd and size are validated above
 	if err != nil {
 		f.Close()
 		return nil, fmt.Errorf("memmap.Create: mmap %s: %w", path, err)
@@ -69,7 +69,7 @@ func Create(path string, size int64) (*MappedFile, error) {
 
 // Open maps an existing file read-write.
 func Open(path string) (*MappedFile, error) {
-	f, err := os.OpenFile(path, os.O_RDWR, 0o600)
+	f, err := os.OpenFile(path, os.O_RDWR, 0o600) // #nosec G304 -- operator-controlled path from configuration, not user input
 	if err != nil {
 		return nil, fmt.Errorf("memmap.Open: open %s: %w", path, err)
 	}
@@ -86,7 +86,7 @@ func Open(path string) (*MappedFile, error) {
 		return nil, fmt.Errorf("memmap.Open: file %s has zero size", path)
 	}
 
-	data, err := sysMmap(int(f.Fd()), 0, int(size), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED)
+	data, err := sysMmap(int(f.Fd()), 0, int(size), unix.PROT_READ|unix.PROT_WRITE, unix.MAP_SHARED) // #nosec G115 -- fd is uintptr from os.File.Fd(), safe to convert to int on all supported platforms
 	if err != nil {
 		f.Close()
 		return nil, fmt.Errorf("memmap.Open: mmap %s: %w", path, err)
@@ -102,7 +102,7 @@ func Open(path string) (*MappedFile, error) {
 
 // OpenReadOnly maps an existing file read-only.
 func OpenReadOnly(path string) (*MappedFile, error) {
-	f, err := os.OpenFile(path, os.O_RDONLY, 0o400)
+	f, err := os.OpenFile(path, os.O_RDONLY, 0o400) // #nosec G304 -- operator-controlled path from configuration, not user input
 	if err != nil {
 		return nil, fmt.Errorf("memmap.OpenReadOnly: open %s: %w", path, err)
 	}
@@ -119,7 +119,7 @@ func OpenReadOnly(path string) (*MappedFile, error) {
 		return nil, fmt.Errorf("memmap.OpenReadOnly: file %s has zero size", path)
 	}
 
-	data, err := sysMmap(int(f.Fd()), 0, int(size), unix.PROT_READ, unix.MAP_SHARED)
+	data, err := sysMmap(int(f.Fd()), 0, int(size), unix.PROT_READ, unix.MAP_SHARED) // #nosec G115 -- fd is uintptr from os.File.Fd(), safe to convert to int on all supported platforms
 	if err != nil {
 		f.Close()
 		return nil, fmt.Errorf("memmap.OpenReadOnly: mmap %s: %w", path, err)

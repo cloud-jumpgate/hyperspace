@@ -67,7 +67,7 @@ func New(buf []byte, termLength int) (*LogBuffer, error) {
 	lb.metaBuf = atomic.NewAtomicBuffer(buf[metaStart : metaStart+LogMetaDataLength])
 
 	// Store term length in meta so readers can discover it.
-	lb.metaBuf.PutInt32LE(metaOffTermLength, int32(termLength))
+	lb.metaBuf.PutInt32LE(metaOffTermLength, int32(termLength)) // #nosec G115 -- termLength validated by validateTermLength to be within [MinTermLength, MaxTermLength], fits in int32
 
 	for i := 0; i < NumPartitions; i++ {
 		lb.appenders[i] = NewTermAppender(lb.terms[i], lb.metaBuf, i)

@@ -190,7 +190,7 @@ func (c *Client) handlePublicationReady(rsp response, corrID int64, channel stri
 	if len(rsp.payload) < 16 {
 		return nil, fmt.Errorf("client: RspPublicationReady payload too short: %d", len(rsp.payload))
 	}
-	sessionID := int32(binary.LittleEndian.Uint32(rsp.payload[8:]))
+	sessionID := int32(binary.LittleEndian.Uint32(rsp.payload[8:])) // #nosec G115 -- protocol wire format: uint32 bytes reinterpreted as int32 session ID
 
 	// Retrieve the log buffer from the conductor's publication state.
 	pubState := c.findPublicationState(corrID)
@@ -286,7 +286,7 @@ func (c *Client) handleSubscriptionReady(rsp response, corrID int64, channel str
 // removePublication sends CmdRemovePublication and removes it from the client's list.
 func (c *Client) removePublication(pub *Publication) error {
 	payload := make([]byte, 8)
-	binary.LittleEndian.PutUint64(payload, uint64(pub.publicationID))
+	binary.LittleEndian.PutUint64(payload, uint64(pub.publicationID)) // #nosec G115 -- protocol wire format: int64 publicationID to uint64 binary encoding
 	c.ring.Write(conductor.CmdRemovePublication, payload)
 
 	c.mu.Lock()
@@ -303,7 +303,7 @@ func (c *Client) removePublication(pub *Publication) error {
 // removeSubscription sends CmdRemoveSubscription and removes it from the client's list.
 func (c *Client) removeSubscription(sub *Subscription) error {
 	payload := make([]byte, 8)
-	binary.LittleEndian.PutUint64(payload, uint64(sub.subscriptionID))
+	binary.LittleEndian.PutUint64(payload, uint64(sub.subscriptionID)) // #nosec G115 -- protocol wire format: int64 subscriptionID to uint64 binary encoding
 	c.ring.Write(conductor.CmdRemoveSubscription, payload)
 
 	c.mu.Lock()
@@ -416,7 +416,7 @@ func (c *Client) dispatchResponse(msgTypeID int32, buf *atomicbuf.AtomicBuffer, 
 	raw := make([]byte, length)
 	buf.GetBytes(offset, raw)
 
-	corrID := int64(binary.LittleEndian.Uint64(raw[0:]))
+	corrID := int64(binary.LittleEndian.Uint64(raw[0:])) // #nosec G115 -- protocol wire format: uint64 bytes reinterpreted as int64 correlation ID
 
 	c.mu.Lock()
 	req, ok := c.pending[corrID]
@@ -465,9 +465,9 @@ func (c *Client) reconcileAfterLap() {
 		}
 		// Synthesise RspPublicationReady payload: correlationID(8) + sessionID(4) + streamID(4).
 		payload := make([]byte, 16)
-		binary.LittleEndian.PutUint64(payload[0:], uint64(pub.PublicationID))
-		binary.LittleEndian.PutUint32(payload[8:], uint32(pub.SessionID))
-		binary.LittleEndian.PutUint32(payload[12:], uint32(pub.StreamID))
+		binary.LittleEndian.PutUint64(payload[0:], uint64(pub.PublicationID)) // #nosec G115 -- protocol wire format: int64 publicationID to uint64 binary encoding
+		binary.LittleEndian.PutUint32(payload[8:], uint32(pub.SessionID))     // #nosec G115 -- protocol wire format: int32 sessionID to uint32 binary encoding
+		binary.LittleEndian.PutUint32(payload[12:], uint32(pub.StreamID))     // #nosec G115 -- protocol wire format: int32 streamID to uint32 binary encoding
 
 		c.mu.Lock()
 		delete(c.pending, pub.PublicationID)
@@ -488,8 +488,8 @@ func (c *Client) reconcileAfterLap() {
 			continue
 		}
 		payload := make([]byte, 12)
-		binary.LittleEndian.PutUint64(payload[0:], uint64(sub.SubscriptionID))
-		binary.LittleEndian.PutUint32(payload[8:], uint32(sub.StreamID))
+		binary.LittleEndian.PutUint64(payload[0:], uint64(sub.SubscriptionID)) // #nosec G115 -- protocol wire format: int64 subscriptionID to uint64 binary encoding
+		binary.LittleEndian.PutUint32(payload[8:], uint32(sub.StreamID))       // #nosec G115 -- protocol wire format: int32 streamID to uint32 binary encoding
 
 		c.mu.Lock()
 		delete(c.pending, sub.SubscriptionID)
@@ -529,9 +529,9 @@ func (c *Client) findPublicationState(publicationID int64) *conductor.Publicatio
 func buildAddPublicationPayload(corrID int64, streamID int32, channel string) []byte {
 	ch := []byte(channel)
 	payload := make([]byte, 16+len(ch))
-	binary.LittleEndian.PutUint64(payload[0:], uint64(corrID))
-	binary.LittleEndian.PutUint32(payload[8:], uint32(streamID))
-	binary.LittleEndian.PutUint32(payload[12:], uint32(len(ch)))
+	binary.LittleEndian.PutUint64(payload[0:], uint64(corrID))   // #nosec G115 -- protocol wire format: int64 corrID to uint64 binary encoding
+	binary.LittleEndian.PutUint32(payload[8:], uint32(streamID)) // #nosec G115 -- protocol wire format: int32 streamID to uint32 binary encoding
+	binary.LittleEndian.PutUint32(payload[12:], uint32(len(ch))) // #nosec G115 -- len(ch) is channel string length, bounded by config limits, fits in uint32
 	copy(payload[16:], ch)
 	return payload
 }
@@ -541,9 +541,9 @@ func buildAddPublicationPayload(corrID int64, streamID int32, channel string) []
 func buildAddSubscriptionPayload(corrID int64, streamID int32, channel string) []byte {
 	ch := []byte(channel)
 	payload := make([]byte, 16+len(ch))
-	binary.LittleEndian.PutUint64(payload[0:], uint64(corrID))
-	binary.LittleEndian.PutUint32(payload[8:], uint32(streamID))
-	binary.LittleEndian.PutUint32(payload[12:], uint32(len(ch)))
+	binary.LittleEndian.PutUint64(payload[0:], uint64(corrID))   // #nosec G115 -- protocol wire format: int64 corrID to uint64 binary encoding
+	binary.LittleEndian.PutUint32(payload[8:], uint32(streamID)) // #nosec G115 -- protocol wire format: int32 streamID to uint32 binary encoding
+	binary.LittleEndian.PutUint32(payload[12:], uint32(len(ch))) // #nosec G115 -- len(ch) is channel string length, bounded by config limits, fits in uint32
 	copy(payload[16:], ch)
 	return payload
 }

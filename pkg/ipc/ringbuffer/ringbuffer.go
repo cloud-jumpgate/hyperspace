@@ -172,7 +172,7 @@ func (rb *OneToOneRingBuffer) Write(msgTypeID int32, src []byte) bool {
 		rb.buf.PutBytes(tailIndex+RecordDescriptorHeaderLength, src)
 	}
 	// Store record_length last to signal record is ready
-	rb.buf.PutInt32Ordered(tailIndex, int32(recordLen))
+	rb.buf.PutInt32Ordered(tailIndex, int32(recordLen)) // #nosec G115 -- recordLen bounded by ring buffer capacity, which is validated to fit in int32
 
 	// Advance tail
 	rb.buf.PutInt64Ordered(tailOff, tail+int64(required))
@@ -182,7 +182,7 @@ func (rb *OneToOneRingBuffer) Write(msgTypeID int32, src []byte) bool {
 // writePadding writes a padding record of exactly `length` bytes at `index`.
 func (rb *OneToOneRingBuffer) writePadding(index, length int) {
 	rb.buf.PutInt32LE(index+4, msgTypePadding)
-	rb.buf.PutInt32Ordered(index, -int32(length)) // negative = padding
+	rb.buf.PutInt32Ordered(index, -int32(length)) // #nosec G115 -- length is ring buffer padding, bounded by capacity which fits in int32; negative signals padding
 }
 
 // Read delivers up to maxMessages messages to the handler. Returns the count delivered.
@@ -345,7 +345,7 @@ func (rb *ManyToOneRingBuffer) Write(msgTypeID int32, src []byte) bool {
 	// If we wrapped, write padding at the old tail position
 	if padding > 0 {
 		rb.buf.PutInt32LE(tailIndex+4, msgTypePadding)
-		rb.buf.PutInt32Ordered(tailIndex, -int32(toEnd))
+		rb.buf.PutInt32Ordered(tailIndex, -int32(toEnd)) // #nosec G115 -- toEnd is ring tail-to-end distance, bounded by capacity which fits in int32; negative signals padding
 		tailIndex = 0
 	}
 
@@ -355,7 +355,7 @@ func (rb *ManyToOneRingBuffer) Write(msgTypeID int32, src []byte) bool {
 		rb.buf.PutBytes(tailIndex+RecordDescriptorHeaderLength, src)
 	}
 	// Publish by writing record_length last
-	rb.buf.PutInt32Ordered(tailIndex, int32(recordLen))
+	rb.buf.PutInt32Ordered(tailIndex, int32(recordLen)) // #nosec G115 -- recordLen bounded by ring buffer capacity, which is validated to fit in int32
 
 	return true
 }

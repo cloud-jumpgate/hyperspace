@@ -32,7 +32,7 @@ func (r *TermReader) Read(
 	termOffset int32,
 	fragmentLimit int,
 ) (int, int32) {
-	capacity := int32(r.termBuffer.Capacity())
+	capacity := int32(r.termBuffer.Capacity()) // #nosec G115 -- term capacity is validated at construction to fit within MaxTermLength (1<<30), well within int32 range
 	framesRead := 0
 	offset := termOffset
 
@@ -44,7 +44,7 @@ func (r *TermReader) Read(
 			break
 		}
 
-		alignedLen := int32(AlignedLength(int(frameLen)))
+		alignedLen := int32(AlignedLength(int(frameLen))) // #nosec G115 -- AlignedLength result bounded by MaxTermLength, fits in int32
 		if int64(offset)+int64(alignedLen) > int64(capacity) {
 			// Corrupt frame — aligned extent would read past buffer end.
 			break

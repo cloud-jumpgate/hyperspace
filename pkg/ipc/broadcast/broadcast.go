@@ -151,7 +151,7 @@ func (t *Transmitter) Transmit(msgTypeID int32, src []byte) error {
 
 	// Publish: store total record length (always >= RecordHeaderLength, so never 0)
 	// This distinguishes a committed zero-payload record from an empty slot (0).
-	recordLen := int32(RecordHeaderLength + len(src))
+	recordLen := int32(RecordHeaderLength + len(src)) // #nosec G115 -- RecordHeaderLength+len(src) bounded by DefaultBroadcastMaxPayload, well within int32 range
 	t.buf.PutInt32Ordered(slotOffset, recordLen)
 
 	// Update the latest counter in the trailer

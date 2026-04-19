@@ -194,7 +194,7 @@ func (s *Sender) sendPublication(_ context.Context, pub *conductor.PublicationSt
 		frameBytes := (*bufPtr)[:frameLen]
 		buf.GetBytes(offset, frameBytes)
 
-		streamID := uint64(hdr.StreamID())
+		streamID := uint64(hdr.StreamID()) // #nosec G115 -- StreamID() returns int32; converting to uint64 for QUIC stream ID selection; value is positive after clamping below
 		if streamID < 2 {
 			streamID = 2
 		}

@@ -96,12 +96,12 @@ func encode(dst []byte, evt Event) {
 	dst[5] = 0
 	dst[6] = 0
 	dst[7] = 0
-	binary.LittleEndian.PutUint64(dst[8:16], uint64(evt.TimestampNs))
+	binary.LittleEndian.PutUint64(dst[8:16], uint64(evt.TimestampNs)) // #nosec G115 -- event wire format: int64 timestamp to uint64 binary encoding
 	binary.LittleEndian.PutUint64(dst[16:24], evt.ConnID)
-	binary.LittleEndian.PutUint32(dst[24:28], uint32(evt.StreamID))
-	binary.LittleEndian.PutUint32(dst[28:32], uint32(evt.SessionID))
-	binary.LittleEndian.PutUint64(dst[32:40], uint64(evt.Value1))
-	binary.LittleEndian.PutUint64(dst[40:48], uint64(evt.Value2))
+	binary.LittleEndian.PutUint32(dst[24:28], uint32(evt.StreamID))  // #nosec G115 -- event wire format: int32 streamID to uint32 binary encoding
+	binary.LittleEndian.PutUint32(dst[28:32], uint32(evt.SessionID)) // #nosec G115 -- event wire format: int32 sessionID to uint32 binary encoding
+	binary.LittleEndian.PutUint64(dst[32:40], uint64(evt.Value1))    // #nosec G115 -- event wire format: int64 value to uint64 binary encoding
+	binary.LittleEndian.PutUint64(dst[40:48], uint64(evt.Value2))    // #nosec G115 -- event wire format: int64 value to uint64 binary encoding
 	copy(dst[48:112], evt.Message[:])
 }
 
@@ -109,12 +109,12 @@ func encode(dst []byte, evt Event) {
 func decode(src []byte) Event {
 	var evt Event
 	evt.Type = EventType(binary.LittleEndian.Uint16(src[0:2]))
-	evt.TimestampNs = int64(binary.LittleEndian.Uint64(src[8:16]))
+	evt.TimestampNs = int64(binary.LittleEndian.Uint64(src[8:16])) // #nosec G115 -- event wire format: uint64 bytes reinterpreted as int64 timestamp
 	evt.ConnID = binary.LittleEndian.Uint64(src[16:24])
-	evt.StreamID = int32(binary.LittleEndian.Uint32(src[24:28]))
-	evt.SessionID = int32(binary.LittleEndian.Uint32(src[28:32]))
-	evt.Value1 = int64(binary.LittleEndian.Uint64(src[32:40]))
-	evt.Value2 = int64(binary.LittleEndian.Uint64(src[40:48]))
+	evt.StreamID = int32(binary.LittleEndian.Uint32(src[24:28]))  // #nosec G115 -- event wire format: uint32 bytes reinterpreted as int32 streamID
+	evt.SessionID = int32(binary.LittleEndian.Uint32(src[28:32])) // #nosec G115 -- event wire format: uint32 bytes reinterpreted as int32 sessionID
+	evt.Value1 = int64(binary.LittleEndian.Uint64(src[32:40]))    // #nosec G115 -- event wire format: uint64 bytes reinterpreted as int64 value
+	evt.Value2 = int64(binary.LittleEndian.Uint64(src[40:48]))    // #nosec G115 -- event wire format: uint64 bytes reinterpreted as int64 value
 	copy(evt.Message[:], src[48:112])
 	return evt
 }

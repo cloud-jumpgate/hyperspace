@@ -257,7 +257,7 @@ func NewRandom(src rand.Source) Arbitrator {
 		src = rand.NewSource(time.Now().UnixNano())
 	}
 	return &randomArbitrator{
-		rng: rand.New(src), //nolint:gosec // used for load balancing, not security
+		rng: rand.New(src), // #nosec G404 -- load balancing connection selection, not a security-sensitive context; nolint:gosec
 	}
 }
 

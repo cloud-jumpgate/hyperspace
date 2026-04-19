@@ -88,7 +88,7 @@ func (img *Image) Poll(handler FragmentHandler, fragmentLimit int) int {
 	}
 
 	// Check if the current term is exhausted and rotation is needed.
-	if img.termOffset >= int32(img.logBuf.TermLength()) {
+	if img.termOffset >= int32(img.logBuf.TermLength()) { // #nosec G115 -- TermLength() validated at construction to be within MaxTermLength, fits in int32
 		img.partIdx = (img.partIdx + 1) % logbuffer.NumPartitions
 		img.termOffset = 0
 		slog.Debug("image: term rotation",
