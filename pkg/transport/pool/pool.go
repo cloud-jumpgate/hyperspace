@@ -37,9 +37,18 @@ func New(peer string, minSize, maxSize int) *Pool {
 
 // Add adds a connection to the pool.
 // If the pool is already at maxSize the connection is not added and an error is returned.
+// If a connection with the same ID already exists, Add is a no-op and returns nil
+// (idempotent — prevents duplicate entries from concurrent pool-manager reconciliation).
 func (p *Pool) Add(c quictr.Connection) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	// Duplicate-ID guard: if a connection with the same ID is already present,
+	// silently return nil rather than appending a duplicate entry.
+	for _, existing := range p.conns {
+		if existing.ID() == c.ID() {
+			return nil
+		}
+	}
 	if len(p.conns) >= p.maxSize {
 		return fmt.Errorf("pool: at capacity (%d/%d)", len(p.conns), p.maxSize)
 	}
