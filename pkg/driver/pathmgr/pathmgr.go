@@ -5,6 +5,7 @@ package pathmgr
 
 import (
 	"context"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,8 +15,9 @@ import (
 )
 
 const (
-	alphaEWMA  = 0.125 // EWMA smoothing factor for sRTT
-	betaRTTVar = 0.25  // EWMA smoothing factor for rttVar
+	alphaEWMA    = 0.125            // EWMA smoothing factor for sRTT
+	betaRTTVar   = 0.25             // EWMA smoothing factor for rttVar
+	probeTimeout = 500 * time.Millisecond // PING timeout: no PONG → MaxInt64 RTT
 )
 
 // ConnectionSample holds per-connection path statistics. Immutable once published.
@@ -60,6 +62,8 @@ type PathManager struct {
 	probeInterval time.Duration
 	seq           uint64                  // monotonic ping sequence counter (protected by mu)
 	pending       map[uint64]pendingProbe // seq → pending probe info
+	// nowFunc is the time source. Overridable for deterministic tests.
+	nowFunc func() time.Time
 }
 
 // New creates a PathManager with the given probe interval.
@@ -73,6 +77,7 @@ func New(probeInterval time.Duration) *PathManager {
 		connStates:    make(map[uint64]*connState),
 		probeInterval: probeInterval,
 		pending:       make(map[uint64]pendingProbe),
+		nowFunc:       time.Now,
 	}
 }
 
@@ -127,7 +132,7 @@ func (pm *PathManager) DoWork(ctx context.Context) int {
 			pm.mu.Lock()
 			pm.seq++
 			seq := pm.seq
-			sentAt := time.Now()
+			sentAt := pm.nowFunc()
 			pm.pending[seq] = pendingProbe{
 				connID: conn.ID(),
 				peer:   pp.peer,
@@ -179,7 +184,7 @@ func (pm *PathManager) DoWork(ctx context.Context) int {
 				continue
 			}
 
-			now := time.Now()
+			now := pm.nowFunc()
 			rttSample := now.Sub(pp2.sentAt)
 
 			pm.mu.Lock()
@@ -242,13 +247,87 @@ func (pm *PathManager) DoWork(ctx context.Context) int {
 
 			snap := &PoolSnapshot{
 				Samples: samples,
-				At:      time.Now(),
+				At:      pm.nowFunc(),
 			}
 			ptr.Store(snap)
 		}
 	}
 
+	// Phase 3: Sweep timed-out PINGs — mark their connections as MaxInt64 RTT.
+	pm.sweepTimedOutProbes()
+
 	return total
+}
+
+// sweepTimedOutProbes marks connections whose PINGs have not received a PONG
+// within probeTimeout as having sRTT = math.MaxInt64. This ensures the
+// LowestRTT arbitrator always prefers a live connection over a dead one.
+//
+// Called at the end of every DoWork cycle under no lock; acquires pm.mu internally.
+func (pm *PathManager) sweepTimedOutProbes() {
+	now := pm.nowFunc()
+
+	pm.mu.Lock()
+	// Collect timed-out entries first; modifying a map while ranging is safe in Go,
+	// but we delete outside the range for clarity.
+	var timedOut []uint64
+	for seq, probe := range pm.pending {
+		if now.Sub(probe.sentAt) >= probeTimeout {
+			timedOut = append(timedOut, seq)
+		}
+	}
+
+	// For each timed-out probe, update its connection state and collect affected peers.
+	affectedPeers := make(map[string]struct{})
+	for _, seq := range timedOut {
+		probe := pm.pending[seq]
+		delete(pm.pending, seq)
+
+		state, exists := pm.connStates[probe.connID]
+		if !exists {
+			state = &connState{}
+			pm.connStates[probe.connID] = state
+		}
+		state.sRTT = time.Duration(math.MaxInt64)
+		state.rttVar = 0
+
+		affectedPeers[probe.peer] = struct{}{}
+	}
+	pm.mu.Unlock()
+
+	// Rebuild and publish snapshots for affected peers so the Arbitrator sees
+	// the updated MaxInt64 RTT immediately.
+	for peer := range affectedPeers {
+		pm.mu.Lock()
+		ptr, ok := pm.snapshots[peer]
+		pm.mu.Unlock()
+		if !ok {
+			continue
+		}
+
+		existing := ptr.Load()
+		if existing == nil {
+			continue
+		}
+
+		// Rebuild samples with updated sRTT values from connStates.
+		pm.mu.Lock()
+		updated := make([]ConnectionSample, len(existing.Samples))
+		for i, s := range existing.Samples {
+			if state, ok := pm.connStates[s.ConnID]; ok {
+				s.EWMRTT = state.sRTT
+				s.RTTVar = state.rttVar
+			}
+			updated[i] = s
+		}
+		pm.mu.Unlock()
+
+		snap := &PoolSnapshot{
+			Samples: updated,
+			At:      now,
+		}
+		ptr.Store(snap)
+	}
 }
 
 // InjectSnapshot directly stores a snapshot for a peer.

@@ -5,13 +5,14 @@ package ssm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"github.com/cloud-jumpgate/hyperspace/pkg/config"
 	envloader "github.com/cloud-jumpgate/hyperspace/pkg/config/env"
@@ -123,9 +124,12 @@ func (l *SSMLoader) getString(ctx context.Context, param string) (string, bool, 
 		WithDecryption: aws.Bool(true),
 	})
 	if err != nil {
-		// AWS returns a ParameterNotFound error for missing parameters.
+		// AWS returns a typed *ssmtypes.ParameterNotFound for missing parameters.
 		// We treat this as a missing value, not a fatal error.
-		if strings.Contains(err.Error(), "ParameterNotFound") {
+		// Using errors.As (not string matching) prevents AccessDeniedException
+		// being silently swallowed as a missing parameter.
+		var notFound *ssmtypes.ParameterNotFound
+		if errors.As(err, &notFound) {
 			slog.Debug("ssm: parameter not found, using default",
 				"path", path,
 			)

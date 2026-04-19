@@ -21,9 +21,14 @@ import (
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/cloud-jumpgate/hyperspace/pkg/identity"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // mockWorkloadClient implements the workloadClient interface for testing.
 type mockWorkloadClient struct {

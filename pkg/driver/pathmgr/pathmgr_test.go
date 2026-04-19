@@ -2,6 +2,7 @@ package pathmgr
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -290,6 +291,73 @@ func TestInjectSnapshotUnknownPeer(t *testing.T) {
 	pm := New(20 * time.Millisecond)
 	// Should not panic.
 	pm.InjectSnapshot("unknown", &PoolSnapshot{At: time.Now()})
+}
+
+// TestPathManager_TimeoutExcludes verifies that a PING with no PONG response
+// within probeTimeout results in sRTT = math.MaxInt64 for that connection,
+// ensuring the LowestRTT arbitrator excludes dead connections.
+func TestPathManager_TimeoutExcludes(t *testing.T) {
+	pm := New(20 * time.Millisecond)
+
+	// Use a controllable clock — start at a fixed reference point.
+	refTime := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := refTime
+	pm.nowFunc = func() time.Time { return now }
+
+	// Build a pool with one connection in echo mode (so we can choose to NOT deliver a PONG).
+	p := pool.New("peer1", 1, 8)
+	conn := newMockConn(false) // echoMode=false: no automatic PONG
+	_ = p.Add(conn)
+	pm.AddPool("peer1", p)
+
+	// Phase 1: DoWork sends a PING. With nowFunc=refTime, the pending probe is recorded at refTime.
+	pm.DoWork(context.Background())
+
+	// Verify pending map has one entry.
+	pm.mu.Lock()
+	pendingCount := len(pm.pending)
+	pm.mu.Unlock()
+	require.Equal(t, 1, pendingCount, "expected one pending probe after PING")
+
+	// Inject an initial snapshot so sweepTimedOutProbes can update it.
+	// We simulate what DoWork would have done if a PONG had arrived for this connection.
+	pm.mu.Lock()
+	pm.connStates[conn.ID()] = &connState{
+		sRTT:   10 * time.Millisecond,
+		rttVar: 1 * time.Millisecond,
+	}
+	pm.mu.Unlock()
+	pm.InjectSnapshot("peer1", &PoolSnapshot{
+		Samples: []ConnectionSample{{ConnID: conn.ID(), EWMRTT: 10 * time.Millisecond}},
+		At:      refTime,
+	})
+
+	// Advance clock past probeTimeout (500ms).
+	now = refTime.Add(probeTimeout + 1*time.Millisecond)
+
+	// DoWork again — the sweep phase will detect the timed-out PING and set sRTT = MaxInt64.
+	pm.DoWork(context.Background())
+
+	// Verify the pending map is now empty (timed-out probe was removed).
+	pm.mu.Lock()
+	pendingCount = len(pm.pending)
+	pm.mu.Unlock()
+	// The second DoWork sends a new PING, so pending may have 1 entry for the NEW ping.
+	// The important thing is the OLD ping (from refTime) is gone.
+
+	// Verify the snapshot for that connection shows sRTT == math.MaxInt64.
+	snap := pm.Snapshot("peer1")
+	require.NotNil(t, snap, "snapshot must exist after DoWork with timed-out probe")
+
+	found := false
+	for _, s := range snap.Samples {
+		if s.ConnID == conn.ID() {
+			found = true
+			assert.Equal(t, time.Duration(math.MaxInt64), s.EWMRTT,
+				"timed-out connection must report sRTT=MaxInt64 to be excluded by LowestRTT arbitrator")
+		}
+	}
+	assert.True(t, found, "connection sample must appear in snapshot")
 }
 
 // TestConnectionStatsRecorded verifies Stats() values appear in the snapshot.

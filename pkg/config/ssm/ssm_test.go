@@ -31,7 +31,9 @@ func (m *mockSSMClient) GetParameter(
 	path := aws.ToString(params.Name)
 	v, ok := m.values[path]
 	if !ok {
-		return nil, errors.New("ParameterNotFound: parameter does not exist")
+		// Return the typed error so errors.As detection works correctly.
+		msg := "parameter does not exist"
+		return nil, &types.ParameterNotFound{Message: &msg}
 	}
 	return &awsssm.GetParameterOutput{
 		Parameter: &types.Parameter{Value: aws.String(v)},
