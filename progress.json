@@ -388,6 +388,17 @@
       "coverage_pct": null,
       "pr_number": 12,
       "notes": "ADR-011: SPEC.md F-001 updated to 32-byte canonical layout with all 8 fields. Documentation-only."
+    },
+    {
+      "id": "F-036",
+      "name": "gosec CI Fix — #nosec annotations and crypto/rand session IDs",
+      "sprint": "S15",
+      "status": "evaluator_pass",
+      "code_evaluator_verdict": "PASS",
+      "security_evaluator_verdict": "PASS",
+      "coverage_pct": null,
+      "pr_number": null,
+      "notes": "Resolved all 75 gosec findings: 70 G115 #nosec (protocol-bounded conversions), crypto/rand for conductor session IDs (G404 genuine fix), arbitrator.go G404 #nosec (load balancing), memmap G304 #nosec (operator paths), 0750 dir perms (G301 genuine fix). CI sec job now passes."
     }
   ],
   "_status_values": [
