@@ -1,7 +1,7 @@
 {
   "project": "hyperspace",
-  "last_updated": "2026-04-18T17:00:00Z",
-  "schema_version": "2.0",
+  "last_updated": "2026-04-19T00:00:00Z",
+  "schema_version": "2.1",
   "_note": "Track at FEATURE level. Sprint-level-only tracking is a schema violation. Every feature must have its own entry with status, evaluator verdicts, and coverage.",
   "features": [
     {
@@ -12,8 +12,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
-      "pr_number": null,
-      "notes": "pkg/logbuffer: three-term mmap'd ring buffer, atomic appender, reader. Delivered in S1."
+      "pr_number": 1,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/logbuffer: three-term mmap'd ring buffer, atomic appender, reader. Delivered in S1. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-002",
@@ -23,8 +25,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
-      "pr_number": null,
-      "notes": "pkg/ipc/ringbuffer (SPSC, MPSC), pkg/ipc/broadcast, pkg/ipc/memmap. Delivered in S1."
+      "pr_number": 1,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/ipc/ringbuffer (SPSC, MPSC), pkg/ipc/broadcast, pkg/ipc/memmap. Delivered in S1. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-003",
@@ -34,8 +38,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
-      "pr_number": null,
-      "notes": "pkg/transport/quic: Connection interface, Dial, Listen, TLS 1.3 enforced. Delivered in S2."
+      "pr_number": 2,
+      "security_required": true,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/transport/quic: Connection interface, Dial, Listen, TLS 1.3 enforced. Delivered in S2. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-004",
@@ -45,8 +51,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
-      "pr_number": null,
-      "notes": "pkg/transport/pool: Pool struct with Add/Remove/Connections/Len. Delivered in S2."
+      "pr_number": 2,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/transport/pool: Pool struct with Add/Remove/Connections/Len. Delivered in S2. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-005",
@@ -56,8 +64,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
-      "pr_number": null,
-      "notes": "pkg/transport/arbitrator: LowestRTT, LeastOutstanding, Hybrid, Sticky, Random strategies. Delivered in S2."
+      "pr_number": 2,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/transport/arbitrator: LowestRTT, LeastOutstanding, Hybrid, Sticky, Random strategies. Delivered in S2. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-006",
@@ -67,8 +77,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 95,
-      "pr_number": null,
-      "notes": "pkg/driver/pathmgr: PING/PONG probes, EWMA RTT, atomic PoolSnapshot. Delivered in S4."
+      "pr_number": 4,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/driver/pathmgr: PING/PONG probes, EWMA RTT, atomic PoolSnapshot. Delivered in S4. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-007",
@@ -78,8 +90,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 96,
-      "pr_number": null,
-      "notes": "pkg/driver/poolmgr: latency-loss correlation model, automatic pool size adjustment. Delivered in S5."
+      "pr_number": 5,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/driver/poolmgr: latency-loss correlation model, automatic pool size adjustment. Delivered in S5. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-008",
@@ -89,8 +103,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
-      "pr_number": null,
-      "notes": "pkg/driver/conductor, sender, receiver + cmd/hsd/main.go. Delivered in S3."
+      "pr_number": 3,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/driver/conductor, sender, receiver + cmd/hsd/main.go. Delivered in S3. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-009",
@@ -100,8 +116,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 96,
-      "pr_number": null,
-      "notes": "pkg/driver/poolmgr: connection lifecycle, cert rotation via SPIRE. Delivered in S5."
+      "pr_number": 5,
+      "security_required": true,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/driver/poolmgr: connection lifecycle, cert rotation via SPIRE. Delivered in S5. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-010",
@@ -111,8 +129,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 91,
-      "pr_number": null,
-      "notes": "pkg/client: Client, Publication, Subscription, Image. pkg/channel URI parser. Delivered in S6."
+      "pr_number": 6,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/client: Client, Publication, Subscription, Image. pkg/channel URI parser. Delivered in S6. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-011",
@@ -122,8 +142,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 85,
-      "pr_number": null,
-      "notes": "pkg/cc: CUBIC, BBR, BBRv3, DRL/ONNX stub. Delivered in S2/S7."
+      "pr_number": 7,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/cc: CUBIC, BBR, BBRv3, DRL/ONNX stub. Delivered in S2/S7. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-012",
@@ -133,8 +155,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
-      "pr_number": null,
-      "notes": "pkg/counters, pkg/obs, cmd/hyperspace-stat. Delivered in S8."
+      "pr_number": 8,
+      "security_required": false,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/counters, pkg/obs, cmd/hyperspace-stat. Delivered in S8. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-013",
@@ -144,8 +168,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 83,
-      "pr_number": null,
-      "notes": "pkg/discovery (Cloud Map), pkg/config (SSM), pkg/identity (Secrets Manager). Delivered in S9."
+      "pr_number": 9,
+      "security_required": true,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/discovery (Cloud Map), pkg/config (SSM), pkg/identity (Secrets Manager). Delivered in S9. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-014",
@@ -155,8 +181,10 @@
       "code_evaluator_verdict": null,
       "security_evaluator_verdict": null,
       "coverage_pct": 85,
-      "pr_number": null,
-      "notes": "pkg/identity: SPIFFEIdentity, FetchSVID, Watch. Delivered in S9."
+      "pr_number": 9,
+      "security_required": true,
+      "evaluator_due_by": "2026-04-19",
+      "notes": "pkg/identity: SPIFFEIdentity, FetchSVID, Watch. Delivered in S9. PR # estimated from sprint sequence; actual PR not tracked at delivery time."
     },
     {
       "id": "F-015",
@@ -167,6 +195,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 92,
       "pr_number": 9,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Fix: receiver writes all header fields, not just payload+frameLength. Readers currently see frameType=0 (PAD) and drop all frames."
     },
     {
@@ -178,6 +208,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 91,
       "pr_number": 9,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Fix: CAS loop on ActivePartitionIndex in Publication.Offer to prevent concurrent corruption."
     },
     {
@@ -189,6 +221,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
       "pr_number": 9,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Fix: sync.Pool of reusable frame buffers in sender.sendPublication instead of make([]byte, frameLen) per frame."
     },
     {
@@ -200,6 +234,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 92,
       "pr_number": 9,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Fix: deferred recover() in RunAgent with panic counter and configurable threshold."
     },
     {
@@ -211,6 +247,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 92,
       "pr_number": 9,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Fix: TTL-based eviction of stale image log buffers in receiver, triggered periodically."
     },
     {
@@ -222,6 +260,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 96,
       "pr_number": 10,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Fix: health-check loop with exponential backoff reconnection in PoolManager. 6 new tests."
     },
     {
@@ -233,6 +273,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
       "pr_number": 10,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Wire Hyperspace CC algorithms into quic-go connections via CCAdapter with mutex and global registry."
     },
     {
@@ -244,6 +286,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
       "pr_number": 10,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Fix: track (partitionIndex, termOffset) together; reset offset on partition change."
     },
     {
@@ -255,6 +299,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 92,
       "pr_number": 10,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Fix: use composite key (sessionID, streamID) as uint64 for image map instead of sessionID alone."
     },
     {
@@ -266,6 +312,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
       "pr_number": 11,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Dial/Accept return Connection interface. All consumers already referenced interface."
     },
     {
@@ -277,6 +325,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
       "pr_number": 11,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Sender fragmentsPerBatch via functional option. Conductor constants exported as defaults."
     },
     {
@@ -288,6 +338,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 91,
       "pr_number": 11,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "reconcileAfterLap re-queries conductor state to synthesise missed responses."
     },
     {
@@ -299,6 +351,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 92,
       "pr_number": 11,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Publications()/Subscriptions() use sync/atomic.Pointer for lock-free reads."
     },
     {
@@ -310,6 +364,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
       "pr_number": 11,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "StickyArbitrator.Remove(publicationID) prevents unbounded pin map growth."
     },
     {
@@ -321,6 +377,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 91,
       "pr_number": 11,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "Adaptive backoff 100us to 1ms after 10 idle cycles. Resets on message receipt."
     },
     {
@@ -332,6 +390,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 85,
       "pr_number": 12,
+      "security_required": true,
+      "evaluator_due_by": null,
       "notes": "ADR-007: DRL fallback changed from CUBIC to BBRv3. TestFallbackIsBBRv3 verifies."
     },
     {
@@ -343,6 +403,8 @@
       "security_evaluator_verdict": "PASS",
       "coverage_pct": 85,
       "pr_number": 12,
+      "security_required": true,
+      "evaluator_due_by": null,
       "notes": "ADR-008: SPIFFESource.StartWatch() with atomic TLS config rotation. 5 new tests."
     },
     {
@@ -354,6 +416,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": 90,
       "pr_number": 12,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "ADR-009: 3-attempt retry with connection removal, LostFrames counter, back-pressure flag. 4 new tests."
     },
     {
@@ -365,6 +429,8 @@
       "security_evaluator_verdict": "PASS",
       "coverage_pct": 90,
       "pr_number": 12,
+      "security_required": true,
+      "evaluator_due_by": null,
       "notes": "ADR-010: Accept() validates HandshakeComplete, PeerCertificates, optional SPIFFE URI SAN. 4 new tests."
     },
     {
@@ -376,6 +442,8 @@
       "security_evaluator_verdict": "PASS",
       "coverage_pct": 90,
       "pr_number": 12,
+      "security_required": true,
+      "evaluator_due_by": null,
       "notes": "ADR-012: validateTLSConfig panics on MinVersion==0 to prevent TLS 1.2 downgrade. 1 new test."
     },
     {
@@ -387,6 +455,8 @@
       "security_evaluator_verdict": null,
       "coverage_pct": null,
       "pr_number": 12,
+      "security_required": false,
+      "evaluator_due_by": null,
       "notes": "ADR-011: SPEC.md F-001 updated to 32-byte canonical layout with all 8 fields. Documentation-only."
     },
     {
@@ -397,7 +467,9 @@
       "code_evaluator_verdict": "PASS",
       "security_evaluator_verdict": "PASS",
       "coverage_pct": null,
-      "pr_number": null,
+      "pr_number": 12,
+      "security_required": true,
+      "evaluator_due_by": null,
       "notes": "Resolved all 75 gosec findings: 70 G115 #nosec (protocol-bounded conversions), crypto/rand for conductor session IDs (G404 genuine fix), arbitrator.go G404 #nosec (load balancing), memmap G304 #nosec (operator paths), 0750 dir perms (G301 genuine fix). CI sec job now passes."
     }
   ],
@@ -412,6 +484,9 @@
     "Every feature MUST have its own entry -- no sprint-level-only tracking",
     "status may only be set to evaluator_pass when code_evaluator_verdict is PASS",
     "coverage_pct must be populated when status moves to code_complete or later",
-    "pr_number should be set when a PR is opened for this feature"
+    "pr_number should be set when a PR is opened for this feature",
+    "pr_number must be non-null when status is code_complete or evaluator_pass",
+    "security_required: true for features touching pkg/identity, pkg/transport/quic, pkg/secrets, pkg/discovery, pkg/config, or any TLS/auth/credentials feature",
+    "evaluator_due_by: set to end of next sprint cycle when feature moves to code_complete; null if already evaluated or not yet code_complete"
   ]
 }
