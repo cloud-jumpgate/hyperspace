@@ -219,6 +219,28 @@ No deliverable passes without clearing all applicable gates:
 
 ---
 
+## CI Health Standards
+
+### Service Level Objectives
+
+| Condition | Classification | Response Required |
+|---|---|---|
+| CI fails on `main` branch | P0 — same-session fix required | Diagnosing agent must fix before any new feature work |
+| CI fails on a sprint branch | P1 — fix before PR merge | Cannot merge with failing CI |
+| CI red for > 1 sprint cycle | ESCALATE to Engineering Orchestrator | Engineering Orchestrator invokes CTO; no new sprints begin |
+
+### CI Red Protocol
+
+When any CI job fails on `main`:
+1. The current session agent diagnoses root cause before any other work
+2. Fix is committed in the same session that discovers the failure
+3. If fix cannot be completed in one session, append a `ci_failure` event to `harness_telemetry.jsonl` with root cause and estimated fix session
+4. No feature may be marked `code_complete` or `evaluator_pass` while CI is red on `main`
+
+This SLO exists because the S11–S15 gosec failure (4 sprints of red CI) demonstrated the compounding cost of deferred CI fixes.
+
+---
+
 ## Common Commands
 
 | Command | Purpose |
@@ -309,8 +331,6 @@ These are not guidelines. These are blocking conditions. An agent that proceeds 
 12. **Invoke the Harness Evaluator at every sprint boundary.** At the end of every sprint, before starting the next, the Harness Evaluator must produce or update `HARNESS_QUALITY_REPORT.md`. This is not optional. This is every sprint.
 
 13. **Do not deliver to the user without Code Evaluator PASS.** The Code Evaluator must independently verify the implementation before the Engineering Orchestrator approves delivery.
-
-14. **Do not skip the Business Requirements stage for new projects.** Every new project must have a validated `requirements.md` (or equivalent approved brief from CTO) before the Harness Architect begins.
 
 ---
 

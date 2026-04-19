@@ -1,3 +1,9 @@
+<!-- 
+  MANDATORY: This template must be completed for every PR.
+  A CI job (harness-check) validates that required checklist items are marked [x].
+  PRs with incomplete checklists will fail CI.
+-->
+
 ## Sprint / Feature
 
 Sprint: <!-- e.g. S3 -->
