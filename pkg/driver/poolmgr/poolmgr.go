@@ -9,12 +9,24 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/cloud-jumpgate/hyperspace/pkg/driver/pathmgr"
 	"github.com/cloud-jumpgate/hyperspace/pkg/transport/pool"
 	quictr "github.com/cloud-jumpgate/hyperspace/pkg/transport/quic"
 )
+
+// SVIDWatcher is implemented by identity.SPIFFESource.
+// StartWatch begins continuously watching for SVID rotation; it blocks until ctx is cancelled.
+// TLSConfig returns the latest TLS config — updated atomically on each SVID rotation.
+// The watcher goroutine must be running (StartWatch called) before TLSConfig returns the
+// first non-nil value. A bootstrap TLS config must be supplied to NewWithSVID to cover
+// the window before the first rotation is detected by the poll loop.
+type SVIDWatcher interface {
+	StartWatch(ctx context.Context) error
+	TLSConfig() *tls.Config
+}
 
 // ErrNoConnections is returned/logged when the pool has drained to zero connections.
 var ErrNoConnections = errors.New("poolmgr: pool has zero connections")
@@ -148,14 +160,19 @@ const (
 
 // PoolManager manages connection lifecycle for one pool.
 type PoolManager struct {
-	pool     *pool.Pool
-	pathMgr  *pathmgr.PathManager
-	learner  *AdaptivePoolLearner
-	tlsConf  *tls.Config
-	peerAddr string
-	ccName   string
-	dialer   Dialer
-	ticker   *time.Ticker
+	pool    *pool.Pool
+	pathMgr *pathmgr.PathManager
+	learner *AdaptivePoolLearner
+	// tlsConf is the active TLS config for dialing new connections.
+	// All reads and writes must hold mu (RLock for reads, Lock for writes).
+	mu      sync.RWMutex
+	tlsConf *tls.Config
+	svid    SVIDWatcher   // nil = no rotation
+	peerAddr          string
+	ccName            string
+	dialer            Dialer
+	ticker            *time.Ticker
+	certCheckInterval time.Duration // how often to poll svid.TLSConfig(); default 1 minute
 	// Health check and reconnection (A-02 fix)
 	healthTicker        *time.Ticker
 	maxReconnectRetries int
@@ -180,6 +197,41 @@ func New(
 	learnerInterval time.Duration,
 	dialer Dialer,
 ) *PoolManager {
+	return newPoolManager(p, pm, learner, nil, tlsConf, peerAddr, ccName, learnerInterval, dialer)
+}
+
+// NewWithSVID creates a PoolManager with SVID rotation support.
+// bootstrapTLS is required — it is used for all dials until the first SVID rotation
+// is detected by the poll loop. Pass the TLS config obtained from identity.Fetch or
+// identity.SPIFFESource.TLSConfig() after starting the watcher.
+// peerAddr: remote address (host:port)
+// ccName: congestion control name for new connections ("cubic", "bbr", "bbrv3", "drl")
+// learnerInterval: how often the Learner runs (default 5s)
+// dialer: optional Dialer function (nil = use quictr.Dial)
+func NewWithSVID(
+	p *pool.Pool,
+	pm *pathmgr.PathManager,
+	learner *AdaptivePoolLearner,
+	svid SVIDWatcher,
+	bootstrapTLS *tls.Config,
+	peerAddr, ccName string,
+	learnerInterval time.Duration,
+	dialer Dialer,
+) *PoolManager {
+	return newPoolManager(p, pm, learner, svid, bootstrapTLS, peerAddr, ccName, learnerInterval, dialer)
+}
+
+// newPoolManager is the shared constructor for New and NewWithSVID.
+func newPoolManager(
+	p *pool.Pool,
+	pm *pathmgr.PathManager,
+	learner *AdaptivePoolLearner,
+	svid SVIDWatcher,
+	tlsConf *tls.Config,
+	peerAddr, ccName string,
+	learnerInterval time.Duration,
+	dialer Dialer,
+) *PoolManager {
 	if learnerInterval <= 0 {
 		learnerInterval = 5 * time.Second
 	}
@@ -190,15 +242,107 @@ func New(
 		pool:                p,
 		pathMgr:             pm,
 		learner:             learner,
+		svid:                svid,
 		tlsConf:             tlsConf,
 		peerAddr:            peerAddr,
 		ccName:              ccName,
 		dialer:              dialer,
 		ticker:              time.NewTicker(learnerInterval),
 		healthTicker:        time.NewTicker(DefaultHealthCheckInterval),
+		certCheckInterval:   time.Minute, // poll svid.TLSConfig() every minute by default
 		maxReconnectRetries: DefaultMaxReconnectRetries,
 		reconnectBaseDelay:  DefaultReconnectBaseDelay,
 		reconnectMaxDelay:   DefaultReconnectMaxDelay,
+	}
+}
+
+// Run starts the SVID rotation watcher goroutine (if svid is set).
+// It polls svid.TLSConfig() at certCheckInterval and calls rotateCerts when the
+// config pointer changes. The goroutine exits when ctx is cancelled.
+// If svid is nil, Run returns immediately.
+func (mgr *PoolManager) Run(ctx context.Context) {
+	if mgr.svid == nil {
+		return
+	}
+	go func() {
+		if err := mgr.svid.StartWatch(ctx); err != nil {
+			slog.Error("poolmgr: SVID watch failed to start",
+				"peer", mgr.peerAddr,
+				"error", err,
+			)
+			return
+		}
+
+		ticker := time.NewTicker(mgr.certCheckInterval)
+		defer ticker.Stop()
+
+		// Seed lastCfg from the bootstrap TLS config stored at construction.
+		mgr.mu.RLock()
+		lastCfg := mgr.tlsConf
+		mgr.mu.RUnlock()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				newCfg := mgr.svid.TLSConfig()
+				if newCfg != nil && newCfg != lastCfg {
+					lastCfg = newCfg
+					mgr.rotateCerts(ctx, newCfg)
+				}
+			}
+		}
+	}()
+}
+
+// rotateCerts performs a blue-green certificate rotation:
+//  1. Snapshot connections opened with the old certificate.
+//  2. Update tlsConf under write lock so future dials use the new cert.
+//  3. Open one new connection per old connection (maintains pool size throughout).
+//  4. Remove old connections AFTER replacements are established (no connectivity gap).
+func (mgr *PoolManager) rotateCerts(ctx context.Context, newTLS *tls.Config) {
+	// 1. Snapshot connections that use the old cert.
+	oldConns := mgr.pool.Connections()
+
+	slog.Info("poolmgr: rotating SVID cert",
+		"peer", mgr.peerAddr,
+		"old_conn_count", len(oldConns),
+	)
+
+	// 2. Update the TLS config under write lock so future dials use the new cert.
+	mgr.mu.Lock()
+	mgr.tlsConf = newTLS
+	mgr.mu.Unlock()
+
+	// 3. Open one replacement connection for each old connection (blue-green: pool
+	// size stays constant throughout rotation — no connectivity gap).
+	for range oldConns {
+		conn, err := mgr.dialer(ctx, mgr.peerAddr, newTLS, mgr.ccName)
+		if err != nil {
+			slog.Error("poolmgr: dial replacement during cert rotation failed",
+				"peer", mgr.peerAddr,
+				"error", err,
+			)
+			break
+		}
+		if err := mgr.pool.Add(conn); err != nil {
+			// Pool is at max capacity — stop opening replacements; old conns
+			// will be removed below, freeing capacity for normal operation.
+			_ = conn.Close()
+			break
+		}
+	}
+
+	// 4. Now remove old connections — replacements are already serving traffic.
+	for _, conn := range oldConns {
+		if err := mgr.pool.Remove(conn.ID()); err != nil {
+			// Connection may already have been removed by the health checker.
+			slog.Debug("poolmgr: remove old conn during rotation (already gone?)",
+				"conn_id", conn.ID(),
+				"error", err,
+			)
+		}
 	}
 }
 
@@ -206,7 +350,11 @@ func New(
 // Called at startup to warm the pool.
 func (mgr *PoolManager) EnsureMinConnections(ctx context.Context) error {
 	for mgr.pool.IsUnderMin() {
-		conn, err := mgr.dialer(ctx, mgr.peerAddr, mgr.tlsConf, mgr.ccName)
+		mgr.mu.RLock()
+		tlsConf := mgr.tlsConf
+		mgr.mu.RUnlock()
+
+		conn, err := mgr.dialer(ctx, mgr.peerAddr, tlsConf, mgr.ccName)
 		if err != nil {
 			return fmt.Errorf("poolmgr: dial %s: %w", mgr.peerAddr, err)
 		}
@@ -246,7 +394,11 @@ func (mgr *PoolManager) DoWork(ctx context.Context) int {
 
 	switch decision {
 	case LearnerDecisionAdd:
-		conn, err := mgr.dialer(ctx, mgr.peerAddr, mgr.tlsConf, mgr.ccName)
+		mgr.mu.RLock()
+		tlsConf := mgr.tlsConf
+		mgr.mu.RUnlock()
+
+		conn, err := mgr.dialer(ctx, mgr.peerAddr, tlsConf, mgr.ccName)
 		if err != nil {
 			return 0
 		}
@@ -331,7 +483,11 @@ func (mgr *PoolManager) healthCheck(ctx context.Context) int {
 				}
 			}
 
-			conn, err := mgr.dialer(ctx, mgr.peerAddr, mgr.tlsConf, mgr.ccName)
+			mgr.mu.RLock()
+			tlsConf := mgr.tlsConf
+			mgr.mu.RUnlock()
+
+			conn, err := mgr.dialer(ctx, mgr.peerAddr, tlsConf, mgr.ccName)
 			if err != nil {
 				mgr.consecutiveFailures++
 				slog.Warn("poolmgr: reconnect failed",

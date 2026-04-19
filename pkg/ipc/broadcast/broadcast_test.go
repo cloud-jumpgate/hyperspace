@@ -266,6 +266,70 @@ func TestMultipleReceivers(t *testing.T) {
 	}
 }
 
+// --- Four receivers (F-002 contract requirement) ---
+//
+// TestBroadcast_MultipleReceivers verifies that exactly 4 independent receivers
+// each receive every message published by the transmitter, as specified in the
+// F-002 sprint contract.
+
+func TestBroadcast_MultipleReceivers(t *testing.T) {
+	const receiverCount = 4
+
+	buf := makeBuf(16)
+	tx, err := NewTransmitter(buf, testMaxPayload)
+	if err != nil {
+		t.Fatalf("NewTransmitter: %v", err)
+	}
+
+	receivers := make([]*Receiver, receiverCount)
+	for i := 0; i < receiverCount; i++ {
+		rx, err := NewReceiverFromStart(buf, testMaxPayload)
+		if err != nil {
+			t.Fatalf("NewReceiverFromStart[%d]: %v", i, err)
+		}
+		receivers[i] = rx
+	}
+
+	messages := []string{"alpha", "beta", "gamma", "delta", "epsilon"}
+	for i, m := range messages {
+		if err := tx.Transmit(int32(i+1), []byte(m)); err != nil {
+			t.Fatalf("Transmit[%d]: %v", i, err)
+		}
+	}
+
+	readAll := func(rxIndex int, rx *Receiver) []string {
+		var got []string
+		for {
+			ok, err := rx.Receive(func(_ int32, b *atomicbuf.AtomicBuffer, offset, length int) {
+				data := make([]byte, length)
+				b.GetBytes(offset, data)
+				got = append(got, string(data))
+			})
+			if err != nil {
+				t.Errorf("receiver[%d] Receive error: %v", rxIndex, err)
+				break
+			}
+			if !ok {
+				break
+			}
+		}
+		return got
+	}
+
+	for i, rx := range receivers {
+		got := readAll(i, rx)
+		if len(got) != len(messages) {
+			t.Errorf("receiver[%d]: expected %d messages, got %d", i, len(messages), len(got))
+			continue
+		}
+		for j, m := range messages {
+			if got[j] != m {
+				t.Errorf("receiver[%d] message[%d]: expected %q, got %q", i, j, m, got[j])
+			}
+		}
+	}
+}
+
 // --- Receiver that starts after some messages ---
 
 func TestReceiverMissesEarlierMessages(t *testing.T) {

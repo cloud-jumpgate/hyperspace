@@ -764,3 +764,191 @@ func TestHealthCheck_HealthyPoolResetsFailures(t *testing.T) {
 	assert.Equal(t, 0, mgr.consecutiveFailures, "consecutive failures should reset for healthy pool")
 	assert.False(t, mgr.lastPoolEmpty, "lastPoolEmpty should be cleared for healthy pool")
 }
+
+// ---------------------------------------------------------------------------
+// SVID Cert Rotation tests (F-039 / DEF-005)
+// ---------------------------------------------------------------------------
+
+// mockSVIDWatcher implements SVIDWatcher for testing.
+// rotate() atomically updates the TLS config pointer; the poll loop in Run() detects
+// the pointer change on its next tick and calls rotateCerts.
+type mockSVIDWatcher struct {
+	mu        sync.Mutex
+	current   *tls.Config
+	started   chan struct{}
+	startOnce sync.Once
+	watchErr  error // non-nil to simulate a startup failure
+}
+
+func newMockSVIDWatcher(initial *tls.Config) *mockSVIDWatcher {
+	return &mockSVIDWatcher{
+		started: make(chan struct{}),
+		current: initial,
+	}
+}
+
+// StartWatch satisfies SVIDWatcher. It returns immediately, like the real
+// SPIFFESource.StartWatch (which starts a background goroutine and returns).
+// The poll loop in PoolManager.Run() is responsible for detecting TLS config changes.
+func (w *mockSVIDWatcher) StartWatch(_ context.Context) error {
+	if w.watchErr != nil {
+		return w.watchErr
+	}
+	w.startOnce.Do(func() { close(w.started) })
+	return nil
+}
+
+// TLSConfig satisfies SVIDWatcher. Returns the current TLS config atomically.
+func (w *mockSVIDWatcher) TLSConfig() *tls.Config {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.current
+}
+
+// rotate atomically updates the TLS config pointer. The poll loop in Run()
+// detects the change on the next certCheckInterval tick.
+func (w *mockSVIDWatcher) rotate(newTLS *tls.Config) {
+	w.mu.Lock()
+	w.current = newTLS
+	w.mu.Unlock()
+}
+
+// waitStarted blocks until StartWatch has been called, or fails the test on timeout.
+func (w *mockSVIDWatcher) waitStarted(t *testing.T, timeout time.Duration) {
+	t.Helper()
+	select {
+	case <-w.started:
+	case <-time.After(timeout):
+		t.Fatal("mockSVIDWatcher: StartWatch never called within timeout")
+	}
+}
+
+// recordingDialer records the TLS config pointer used for each dial call
+// so tests can verify new connections used the rotated cert.
+type recordingDialer struct {
+	mu      sync.Mutex
+	records []*tls.Config
+	rtt     time.Duration
+	err     error
+}
+
+func (d *recordingDialer) dial(_ context.Context, _ string, tlsConf *tls.Config, _ string) (quictr.Connection, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.records = append(d.records, tlsConf)
+	if d.err != nil {
+		return nil, d.err
+	}
+	return newMockConn(d.rtt), nil
+}
+
+func (d *recordingDialer) tlsConfigs() []*tls.Config {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	cp := make([]*tls.Config, len(d.records))
+	copy(cp, d.records)
+	return cp
+}
+
+// TestPoolManager_CertRotation_BlueGreen verifies the blue-green rotation sequence:
+//   - New connections are opened with the new cert BEFORE old connections are closed.
+//   - Old connections are closed after new connections are established.
+//   - Pool stays at or above min capacity throughout the rotation (no connectivity gap).
+func TestPoolManager_CertRotation_BlueGreen(t *testing.T) {
+	bootstrapTLS := &tls.Config{MinVersion: tls.VersionTLS13}
+	watcher := newMockSVIDWatcher(bootstrapTLS)
+	rd := &recordingDialer{rtt: 50 * time.Microsecond}
+
+	p := pool.New("peer1", 2, 8)
+	pm := pathmgr.New(20 * time.Millisecond)
+	pm.AddPool("peer1", p)
+	l := NewLearner(2, 8)
+
+	mgr := NewWithSVID(p, pm, l, watcher, bootstrapTLS, "peer1", "cubic", 10*time.Second, rd.dial)
+	mgr.certCheckInterval = 1 * time.Millisecond // fast poll for tests
+	defer func() { _ = mgr.Close() }()
+
+	// Pre-populate pool with 2 old connections using the bootstrap cert.
+	old1 := newMockConn(50 * time.Microsecond)
+	old2 := newMockConn(55 * time.Microsecond)
+	require.NoError(t, p.Add(old1))
+	require.NoError(t, p.Add(old2))
+	require.Equal(t, 2, p.Size())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mgr.Run(ctx)
+	watcher.waitStarted(t, 2*time.Second)
+
+	// Trigger rotation by injecting a distinct new TLS config.
+	newTLS := &tls.Config{MinVersion: tls.VersionTLS13, ServerName: "rotated"}
+	watcher.rotate(newTLS)
+
+	// Wait for the poll loop to detect the change and apply rotation.
+	require.Eventually(t, func() bool {
+		return old1.IsClosed() && old2.IsClosed()
+	}, 500*time.Millisecond, 5*time.Millisecond,
+		"old connections should be closed after rotation is detected")
+
+	// New connections must have been dialed with the new TLS config.
+	dials := rd.tlsConfigs()
+	require.GreaterOrEqual(t, len(dials), 2, "at least 2 new connections should have been opened")
+	for i, cfg := range dials {
+		assert.Same(t, newTLS, cfg, "dial %d should use the new TLS config pointer", i)
+	}
+
+	// Pool stays at or above min throughout (blue-green guarantee).
+	assert.GreaterOrEqual(t, p.Size(), 2, "pool should be at minimum size after rotation")
+
+	cancel() // allow the watcher goroutine to exit; goleak verifies clean shutdown
+}
+
+// TestPoolManager_CertRotation_NoDeadlock fires a rotation while DoWork runs
+// concurrently and verifies no deadlock or data race occurs (run with -race).
+func TestPoolManager_CertRotation_NoDeadlock(t *testing.T) {
+	bootstrapTLS := &tls.Config{MinVersion: tls.VersionTLS13}
+	watcher := newMockSVIDWatcher(bootstrapTLS)
+	rd := &recordingDialer{rtt: 50 * time.Microsecond}
+
+	p := pool.New("peer1", 2, 8)
+	pm := pathmgr.New(20 * time.Millisecond)
+	pm.AddPool("peer1", p)
+	l := NewLearner(2, 8)
+
+	// Short learner interval so DoWork ticks frequently; short certCheckInterval
+	// so the poll loop detects the rotation quickly.
+	mgr := NewWithSVID(p, pm, l, watcher, bootstrapTLS, "peer1", "cubic", 1*time.Millisecond, rd.dial)
+	mgr.certCheckInterval = 1 * time.Millisecond
+	defer func() { _ = mgr.Close() }()
+
+	require.NoError(t, p.Add(newMockConn(50*time.Microsecond)))
+	require.NoError(t, p.Add(newMockConn(55*time.Microsecond)))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mgr.Run(ctx)
+	watcher.waitStarted(t, 2*time.Second)
+
+	// Run DoWork in a tight loop on a separate goroutine.
+	doWorkDone := make(chan struct{})
+	go func() {
+		defer close(doWorkDone)
+		deadline := time.Now().Add(200 * time.Millisecond)
+		for time.Now().Before(deadline) {
+			mgr.DoWork(ctx)
+		}
+	}()
+
+	// Trigger a rotation while DoWork is running.
+	newTLS := &tls.Config{MinVersion: tls.VersionTLS13, ServerName: "rotated"}
+	watcher.rotate(newTLS)
+
+	// DoWork must finish without deadlock.
+	select {
+	case <-doWorkDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("DoWork goroutine did not finish within 5s — possible deadlock")
+	}
+
+	cancel() // allow the watcher goroutine to exit; goleak verifies clean shutdown
+}

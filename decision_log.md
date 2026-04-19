@@ -22,6 +22,8 @@
 | ADR-012 | TLS MinVersion=0 must be rejected explicitly | Accepted | 2026-04-18 | CTO |
 | ADR-013 | Adaptive Pool Learner: Saturation/Spread Heuristic vs RTT Projection Model | Accepted | 2026-04-19 | CTO |
 | ADR-014 | Sender Frame Drop vs Hold-and-Retry on Empty Connection Pool | Accepted | 2026-04-19 | CTO |
+| ADR-015 | QUIC 0-RTT Session Resumption — Replay Risk Deferred | Accepted (review before prod deploy) | 2026-04-19 | CTO |
+| ADR-016 | SVIDWatcher Interface — Polling Over Callback | Accepted | 2026-04-19 | CTO |
 
 ---
 
@@ -596,3 +598,78 @@ The drop-with-back-pressure pattern is accepted. The Publication's Offer method 
 #### Review Trigger
 
 Re-evaluate if benchmarks show that application-layer retry introduces unacceptable latency spikes compared to a bounded in-driver retry buffer.
+
+---
+
+### ADR-015: QUIC 0-RTT Session Resumption — Replay Risk Deferred
+
+**Date:** 2026-04-19
+**Status:** Accepted (review required before production deploy to adversarial environments)
+**Author:** CTO (Architecture Evaluator S17 finding Q-001)
+
+#### Context
+
+`pkg/transport/quic/conn.go` sets `Allow0RTT: true` in the quic-go transport config. 0-RTT allows a client to send application data before the TLS handshake completes, reducing connection setup latency for QUIC session resumption.
+
+Risk: 0-RTT data is susceptible to replay attacks. An adversary who intercepts a 0-RTT packet can replay it, potentially triggering duplicate state at the server. This has been open since S2 (16 sprints, Architecture Evaluator finding Q-001).
+
+#### Decision
+
+Accept `Allow0RTT: true` with the following conditions:
+1. All application data sent over 0-RTT paths must be idempotent. Hyperspace publish frames are idempotent by nature — a subscriber receiving a duplicate frame is harmless for most use cases.
+2. Before deploying to regulated or financial-sector environments, evaluate server-side deduplication via frame IDs or quic-go's anti-replay (`SessionTicketKey` rotation + `EarlyData` limiter).
+3. If replay mitigation is required: set `Allow0RTT: false`.
+
+No code change required immediately.
+
+#### Consequences
+
+- No change to current implementation.
+- The Architecture Evaluator must re-evaluate this decision before any production deploy where replay attacks are in the threat model.
+
+#### Review Trigger
+
+Required before production deploy to regulated environments. Re-evaluate with each major quic-go release for 0-RTT security improvements.
+
+---
+
+### ADR-016: SVIDWatcher Interface — Polling Over Callback
+
+**Date:** 2026-04-19
+**Status:** Accepted
+**Author:** CTO (Architecture Evaluator S17 finding P0)
+**Supersedes:** Initial callback-based SVIDWatcher introduced during S17 DEF-005 implementation
+
+#### Context
+
+The initial DEF-005 implementation defined `SVIDWatcher` with a callback-based `StartWatch`:
+```go
+type SVIDWatcher interface {
+    StartWatch(ctx context.Context, callback func(newTLS *tls.Config)) error
+}
+```
+
+`identity.SPIFFESource.StartWatch` has signature `StartWatch(ctx context.Context) error` (no callback). It stores the latest TLS config via `atomic.Pointer` accessible via `TLSConfig() *tls.Config`, per ADR-008. The signature mismatch prevented direct wiring of `SPIFFESource` as `SVIDWatcher` — a P0 architectural defect.
+
+#### Decision
+
+Change `SVIDWatcher` to the polling interface:
+```go
+type SVIDWatcher interface {
+    StartWatch(ctx context.Context) error
+    TLSConfig() *tls.Config
+}
+```
+
+`PoolManager.Run()` calls `StartWatch` once (which starts the watcher goroutine and returns immediately), then polls `svid.TLSConfig()` on `certCheckInterval` (default: 1 minute). When the TLS config pointer changes, `rotateCerts` is invoked with blue-green rotation semantics.
+
+#### Consequences
+
+- `*identity.SPIFFESource` directly satisfies `SVIDWatcher` — no adapter required.
+- `certCheckInterval` (default 1 minute) means rotation is detected within ≤1 minute of SPIRE issuing a new SVID. SVID TTL is typically 1 hour; this latency is acceptable.
+- `rotateCerts` opens one replacement connection per old connection before removing old connections — no connectivity gap during rotation.
+- Tests set `mgr.certCheckInterval = 1ms` for deterministic fast polling.
+
+#### Review Trigger
+
+If SVID TTL is reduced below 5 minutes in production, reduce `certCheckInterval` proportionally (target: ≤ TTL/10).

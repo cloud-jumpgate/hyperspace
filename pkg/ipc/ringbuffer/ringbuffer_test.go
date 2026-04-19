@@ -454,6 +454,66 @@ func TestManyToOneNoDuplicates(t *testing.T) {
 	}
 }
 
+// --- MPSC: 16 producers × 1,000 messages (F-002 contract requirement) ---
+//
+// TestMPSC_ConcurrentProducers verifies the ManyToOneRingBuffer under the
+// concurrency load specified in the F-002 sprint contract: exactly 16 producer
+// goroutines each writing 1,000 messages = 16,000 total messages consumed by
+// a single reader with zero loss.
+
+func TestMPSC_ConcurrentProducers(t *testing.T) {
+	const goroutines = 16
+	const msgsPerGoroutine = 1000
+	const totalMessages = goroutines * msgsPerGoroutine // 16,000
+
+	// Each record: alignedLength(8 + 8) = 16 bytes.
+	// Total data: 16 * 1000 * 16 = 256,000 bytes. Use 512 KB ring (524288) + trailer.
+	rb, err := NewManyToOneRingBuffer(makeRingBuffer(1 << 19)) // 512 KB ring
+	if err != nil {
+		t.Fatalf("NewManyToOneRingBuffer: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for g := 0; g < goroutines; g++ {
+		g := g
+		go func() {
+			defer wg.Done()
+			payload := make([]byte, 8)
+			for i := 0; i < msgsPerGoroutine; i++ {
+				payload[0] = byte(g)
+				payload[1] = byte(i >> 8)
+				payload[2] = byte(i & 0xFF)
+				for !rb.Write(int32(g+1), payload) {
+					// Back-pressure spin: ring is sized to hold all messages so
+					// this should never trigger, but yield defensively.
+					runtime.Gosched()
+				}
+			}
+		}()
+	}
+
+	// Wait for ALL 16 producers to finish committing before consuming.
+	// Guarantees no uncommitted slots when the single reader starts.
+	wg.Wait()
+
+	// Single-consumer drain.
+	var received int
+	for received < totalMessages {
+		n := rb.Read(func(int32, *atomicbuf.AtomicBuffer, int, int) {
+			received++
+		}, 200)
+		if n == 0 && received < totalMessages {
+			runtime.Gosched()
+		}
+	}
+
+	if received != totalMessages {
+		t.Errorf("TestMPSC_ConcurrentProducers: expected exactly %d messages, got %d (lost %d)",
+			totalMessages, received, totalMessages-received)
+	}
+}
+
 // --- ManyToOne wrap-around ---
 
 func TestManyToOneWrapAround(t *testing.T) {
