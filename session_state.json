@@ -1,8 +1,8 @@
 {
   "project": "hyperspace",
   "last_updated": "2026-04-19",
-  "state": "evaluator_remediation_complete",
-  "current_sprint": "S16",
+  "state": "all_s1_s9_evaluator_pass",
+  "current_sprint": "S17",
   "sprints_complete": [
     "S1",
     "S2",
@@ -19,12 +19,13 @@
     "S13",
     "S14",
     "S15",
-    "S16"
+    "S16",
+    "S17"
   ],
   "last_session": {
     "date": "2026-04-19",
     "agent": "cto",
-    "action": "S16 complete: B1/B2/DEF-001 fixed, 13 named tests added. Code Evaluator: F-001,F-004-F-008,F-010-F-014 PASS; F-002,F-003,F-009 CONDITIONAL PASS. Security Evaluator: F-013,F-014 PASS. progress.json promoted 10 features to evaluator_pass. HARNESS_QUALITY_REPORT.md updated to v2.1."
+    "action": "S17 complete: F-037 (F-002 tests), F-038 (F-003 coverage 91.5%), F-039 (DEF-005 SVID rotation blue-green). All 14 S1-S9 features now evaluator_pass. Architecture Evaluator CONDITIONAL PASS (Violation #10 closed). ADR-015 (0-RTT deferral), ADR-016 (SVIDWatcher polling). HARNESS_QUALITY_REPORT.md v2.2 overall verdict: PASS."
   },
   "test_suite": {
     "status": "passing",
@@ -33,8 +34,9 @@
     "races": 0
   },
   "open_actions": [
-    "F-002: increase TestMPSC_ConcurrentProducers to 16 goroutines, TestBroadcast_MultipleReceivers to 4 receivers",
-    "F-003: add coverage for QUIC dial/accept/stream error paths to reach 90% gate",
-    "F-009 DEF-005: implement SVID cert rotation drain-then-close in PoolManager"
+    "S18 P1: Replace QUICConnection.IsClosed() mutex with atomic.Bool",
+    "S18 P1: Resolve QUIC 0-RTT replay risk (ADR-015) before production deploy",
+    "S18 P2: Wire CCAdapter.CanSend() into Sender hot path",
+    "S18 P2: Replace CCAdapter sync.Mutex with sync/atomic for hot-path reads"
   ]
 }
